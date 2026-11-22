@@ -117,19 +117,129 @@ async function vDash0(){
 }
 
 /* ---------- customers ---------- */
+/* ---------- العملاء: عرض من العقود + استيراد/تصدير ---------- */
+var CU_CATS={all:'الكل',active:'نشط (عقد ساري)',late:'متأخر عن السداد',legal:'شؤون قانونية',closed:'منتهي (سدّد بالكامل)',inquiry:'استعلام موافق عليه (لم يستلم)',pending:'عقد قيد الإنشاء',none:'بدون عقد'};
+var CU_HEAD=['كود العميل','الاسم','الهاتف','الرقم القومي','العنوان','المنطقة','نوع السكن','الدخل الشهري','الفرع','موافقة تسويق'];
+function cuDig(s){return String(s==null?'':s).replace(/[٠-٩]/g,function(d){return '٠١٢٣٤٥٦٧٨٩'.indexOf(d)}).replace(/[۰-۹]/g,function(d){return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)})}
+function cuNorm(s){return String(s==null?'':s).replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/\s+/g,' ').trim()}
+function cuWords(s){return String(s||'').trim().split(/\s+/).filter(Boolean).length}
+function cuQ(v){v=v==null?'':String(v);return /[",\n\t]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
+function cuParse(text){
+ text=String(text||'').replace(/^﻿/,'');
+ var lines=text.split(/\r?\n/),first=lines.filter(function(l){return l.trim()&&l.trim().charAt(0)!='#'})[0]||'';
+ var d=first.indexOf('\t')>=0?'\t':first.indexOf(';')>=0&&first.indexOf(',')<0?';':',';
+ var rows=[],row=[],cur='',q=false,i,c;
+ for(i=0;i<text.length;i++){c=text.charAt(i);
+  if(q){if(c=='"'){if(text.charAt(i+1)=='"'){cur+='"';i++}else q=false}else cur+=c}
+  else if(c=='"')q=true;
+  else if(c==d){row.push(cur);cur=''}
+  else if(c=='\n'||c=='\r'){if(c=='\r'&&text.charAt(i+1)=='\n')i++;row.push(cur);cur='';rows.push(row);row=[]}
+  else cur+=c}
+ if(cur!==''||row.length){row.push(cur);rows.push(row)}
+ return rows.filter(function(r){var a=String(r[0]||'').trim();return r.some(function(x){return String(x).trim()})&&a.charAt(0)!='#'&&a.indexOf('مثال')!==0})
+}
+function cuCheck(o,isNew){var e=[];
+ if(cuWords(o.full_name)<4)e.push('الاسم أقل من 4 كلمات');
+ if(o.phone&&!/^[0-9]{1,11}$/.test(o.phone))e.push('الهاتف أكثر من 11 رقمًا أو به حروف');
+ if(o.national_id&&!/^[0-9]{1,14}$/.test(o.national_id))e.push('الرقم القومي أكثر من 14 رقمًا أو به حروف');
+ if(o.customer_code&&o.customer_code.length>40)e.push('الكود طويل');
+ return e}
+function cuTemplate(){
+ var L=['# تعليمات الاستيراد (الأسطر التي تبدأ بعلامة # لا تُستورد):','# 1) املأ البيانات تحت صف العناوين، صف لكل عميل، ثم احذف صفوف المثال أو اتركها (تبدأ بكلمة مثال ولا تُستورد).','# 2) الاسم 4 كلمات على الأقل. الهاتف حتى 11 رقمًا. الرقم القومي حتى 14 رقمًا. اكتبها كنص حتى لا يُحذف الصفر.','# 3) كود العميل هو نفسه كود العقد، ويُترك فارغًا إن لم يكن موجودًا. الفرع والمنطقة بنفس الاسم المسجل في النظام.','# 4) نوع السكن: تمليك أو إيجار قديم. موافقة تسويق: نعم أو لا.','# 5) من جوجل شيت: ملف ← تنزيل ← CSV، ثم ارفعه هنا. أو انسخ الخلايا والصقها في الخانة.',CU_HEAD.join(','),
+  ['مثال-1','محمد أحمد علي حسن','01012345678','29001011234567','12 شارع الهرم، الدور الثالث، شقة 8، الجيزة','الهرم','تمليك','6000',(S.branches[0]||{}).name||'','نعم'].map(cuQ).join(','),
+  ['مثال-2','سعيد محمود إبراهيم السيد','01123456789','','5 شارع فيصل، عمارة 4','فيصل','إيجار قديم','4500',(S.branches[0]||{}).name||'','لا'].map(cuQ).join(',')];
+ dl('قالب-استيراد-العملاء.csv',L.join('\r\n'))}
+async function cuAll(q){var out=[],from=0,r;for(;;){r=await q().range(from,from+999);if(r.error)throw r.error;out=out.concat(r.data||[]);if(!r.data||r.data.length<1000)break;from+=1000}return out}
 async function vCust(){
- var r=await sb.from('customers').select('*,zones(name),branches(name)').order('created_at',{ascending:false}).limit(500);
- if(r.error)throw r.error;
- var canNew=['system_admin','branch_manager','sales'].indexOf(S.me.role)>=0,v=$('#v');
- var form=canNew?'<div class="card"><h2>عميل جديد</h2><div class="f"><div><label for="cn">الاسم</label><input id="cn"></div><div><label for="cp">الهاتف</label><input id="cp" inputmode="tel"></div><div><label for="ci">الرقم القومي</label><input id="ci" inputmode="numeric"></div><div><label for="ca">العنوان</label><input id="ca"></div><div><label for="cz">المنطقة (من القائمة المعتمدة)</label><select id="cz">'+opts(S.zones,'id',function(z){return z.name+' – '+z.governorate},'','اختر')+'</select></div><div><label for="ch">نوع السكن</label><select id="ch"><option value="">اختر</option><option value="old_rent">إيجار قديم</option><option value="owned">تمليك</option></select></div><div><label for="cm">الدخل الشهري</label><input id="cm" type="number" min="0"></div>'+(S.me.role=='system_admin'?'<div><label for="cb">الفرع</label><select id="cb">'+opts(S.branches,'id','name','','اختر')+'</select></div>':'')+'<div><label><input type="checkbox" id="cc"> موافقة على التواصل التسويقي</label></div></div><button class="btn am" id="cs" style="margin-top:10px">حفظ العميل</button></div>':'';
- v.innerHTML=form+'<div class="card"><div class="row"><h2>العملاء ('+r.data.length+')</h2><input id="cq" placeholder="بحث بالاسم أو الهاتف" style="max-width:220px"></div><div class="wrap"><table id="ct"></table></div></div>';
- function draw(){var q=$('#cq').value.trim();$('#ct').innerHTML='<tr><th>الاسم</th><th>الهاتف</th><th>المنطقة</th><th>الفرع</th><th>الدخل</th></tr>'+r.data.filter(function(c){return !q||(c.full_name+' '+(c.phone||'')).indexOf(q)>=0}).map(function(c){return '<tr><td>'+esc(c.full_name)+'</td><td>'+esc(c.phone)+'</td><td>'+esc(c.zones&&c.zones.name)+'</td><td>'+esc(c.branches&&c.branches.name)+'</td><td>'+n(c.monthly_income)+'</td></tr>'}).join('')}
- draw();$('#cq').oninput=draw;
- if(canNew)$('#cs').onclick=async function(){
-  var nm=$('#cn').value.trim();if(!nm)return msg('اكتب اسم العميل',1);
-  var bid=S.me.role=='system_admin'?$('#cb').value:S.me.branch_id;if(!bid)return msg('حدد الفرع',1);
-  var x=await sb.from('customers').insert({branch_id:bid,full_name:nm,phone:$('#cp').value.trim()||null,national_id:$('#ci').value.trim()||null,address:$('#ca').value.trim()||null,zone_id:$('#cz').value||null,housing:$('#ch').value||null,monthly_income:$('#cm').value?+$('#cm').value:null,marketing_consent:$('#cc').checked,consent_at:$('#cc').checked?new Date().toISOString():null});
-  if(x.error)return msg(em(x.error),1);msg('تم حفظ العميل');vCust()}
+ var role=S.me.role,canNew=['system_admin','branch_manager','sales'].indexOf(role)>=0,canImp=['system_admin','branch_manager'].indexOf(role)>=0,v=$('#v');
+ var R=await Promise.all([
+  cuAll(function(){return sb.from('customers').select('*,zones(name),branches(name)').order('created_at',{ascending:false})}),
+  cuAll(function(){return sb.from('contracts').select('id,customer_id,status,code,created_at')}),
+  sb.from('v_delinquency').select('customer_id,days_late'),
+  sb.from('investigations').select('id,customer_name,customer_phone,customer_address,national_id,branch_id,decided_at').eq('status','approved').limit(1000)]);
+ var C=R[0],K=R[1],DQ=(R[2].data||[]),AI=(R[3].data||[]);
+ var kb={};K.forEach(function(k){(kb[k.customer_id]=kb[k.customer_id]||[]).push(k)});
+ var late={};DQ.forEach(function(d){if(d.days_late>0)late[d.customer_id]=Math.max(late[d.customer_id]||0,d.days_late)});
+ var ai={};AI.forEach(function(a){ai[a.national_id]=a});
+ var rows=C.map(function(c){var ks=kb[c.id]||[],has=function(s){return ks.some(function(k){return k.status==s})};
+  var active=has('active'),legal=has('legal'),closed=has('closed')&&!active&&!legal,received=active||legal||has('closed'),pend=!received&&ks.some(function(k){return ['draft','pending_credit','approved'].indexOf(k.status)>=0}),inq=!received&&!!(c.national_id&&ai[c.national_id]);
+  var f={active:active,late:!!late[c.id],legal:legal,closed:closed,inquiry:inq,pending:pend&&!inq,none:!ks.length&&!inq};
+  var lb=legal?'شؤون قانونية':late[c.id]?'متأخر '+late[c.id]+' يومًا':active?'نشط':inq?'استعلام موافق (لم يستلم)':closed?'منتهي':pend?'عقد قيد الإنشاء':'بدون عقد';
+  var code=c.customer_code||(ks.filter(function(k){return k.code})[0]||{}).code||'';
+  return{kind:'c',c:c,f:f,label:lb,code:code,name:c.full_name,phone:c.phone||'',nid:c.national_id||'',addr:c.address||'',zone:(c.zones&&c.zones.name)||'',branch:(c.branches&&c.branches.name)||'',branch_id:c.branch_id,housing:c.housing,income:c.monthly_income,consent:c.marketing_consent,n:ks.length}});
+ var have={};C.forEach(function(c){if(c.national_id)have[c.national_id]=1});
+ AI.forEach(function(a){if(!have[a.national_id])rows.push({kind:'i',c:a,f:{inquiry:1},label:'استعلام موافق (لم يستلم)',code:'',name:a.customer_name,phone:a.customer_phone||'',nid:a.national_id||'',addr:a.customer_address||'',zone:'',branch:bn(a.branch_id),branch_id:a.branch_id,housing:null,income:null,consent:false,n:0})});
+ var F=S.cf=S.cf||{cat:'all',br:'',zn:'',hs:'',mk:'',q:'',pg:1},edit=S.cedit&&C.filter(function(c){return c.id==S.cedit})[0];
+ var codes={};C.forEach(function(c){if(c.customer_code)codes[c.customer_code]=1});
+ function filt(){var q=cuNorm(cuDig(F.q)).toLowerCase();return rows.filter(function(r){
+  if(F.cat!='all'&&!r.f[F.cat])return false;if(F.br&&r.branch_id!=F.br)return false;if(F.zn&&(!r.c.zone_id||r.c.zone_id!=F.zn))return false;if(F.hs&&r.housing!=F.hs)return false;
+  if(F.mk=='1'&&!r.consent)return false;if(F.mk=='0'&&r.consent)return false;
+  if(q&&(cuNorm(r.name).toLowerCase().indexOf(q)<0&&r.phone.indexOf(q)<0&&r.nid.indexOf(q)<0&&String(r.code).toLowerCase().indexOf(q)<0))return false;return true})}
+ var cnt={};Object.keys(CU_CATS).forEach(function(k){cnt[k]=k=='all'?rows.length:rows.filter(function(r){return r.f[k]}).length});
+ var E=edit||{};
+ var form=canNew?'<div class="card"><h2>'+(edit?'تعديل عميل':'عميل جديد')+'</h2><div class="f"><div><label for="cn">الاسم (4 كلمات على الأقل)</label><input id="cn" value="'+esc(E.full_name)+'"></div><div><label for="cp">الهاتف (حتى 11 رقمًا)</label><input id="cp" inputmode="numeric" maxlength="11" value="'+esc(E.phone)+'"></div><div><label for="ci">الرقم القومي (حتى 14 رقمًا)</label><input id="ci" inputmode="numeric" maxlength="14" value="'+esc(E.national_id)+'"></div><div><label for="cc2">كود العميل (= كود العقد)</label><input id="cc2" maxlength="40" value="'+esc(E.customer_code)+'"></div><div><label for="cz">المنطقة</label><select id="cz">'+opts(S.zones,'id',function(z){return z.name+' – '+z.governorate},E.zone_id,'اختر')+'</select></div><div><label for="ch">نوع السكن</label><select id="ch"><option value="">اختر</option><option value="old_rent"'+(E.housing=='old_rent'?' selected':'')+'>إيجار قديم</option><option value="owned"'+(E.housing=='owned'?' selected':'')+'>تمليك</option></select></div><div><label for="cm">الدخل الشهري</label><input id="cm" type="number" min="0" value="'+(E.monthly_income==null?'':E.monthly_income)+'"></div>'+(role=='system_admin'&&!edit?'<div><label for="cb">الفرع</label><select id="cb">'+opts(S.branches,'id','name','','اختر')+'</select></div>':'')+'</div><label for="ca" style="margin-top:8px">العنوان بالتفصيل</label><textarea id="ca" rows="4" placeholder="المحافظة، الحي، الشارع، رقم العقار، الدور، الشقة، علامة مميزة">'+esc(E.address)+'</textarea><label style="margin-top:8px"><input type="checkbox" id="cc"'+(E.marketing_consent?' checked':'')+'> موافقة العميل على الرسائل التسويقية</label><div class="pay"><button class="btn am" id="cs">'+(edit?'حفظ التعديل':'حفظ العميل')+'</button>'+(edit?'<button class="btn" id="cx">إلغاء</button>':'')+'</div></div>':'';
+ var imp=canImp?'<details class="card"><summary><b>استيراد عملاء من جوجل شيت</b></summary><ol class="hint"><li>نزّل القالب واملأه (أو انسخ بياناتك القديمة في نفس الأعمدة).</li><li>من جوجل شيت: ملف ← تنزيل ← CSV، ثم اختر الملف هنا، أو انسخ الخلايا والصقها في الخانة.</li><li>اضغط «فحص» لمراجعة النتيجة قبل الاستيراد. الصفوف المرفوضة تُنزَّل في ملف لتصحيحها.</li></ol><div class="pay"><button class="btn" id="ct0">تنزيل قالب الاستيراد</button><input type="file" id="cfile" accept=".csv,.txt,.tsv,text/csv" aria-label="ملف CSV">'+(role=='system_admin'?'<select id="cib" aria-label="الفرع الافتراضي">'+opts(S.branches,'id','name','','الفرع الافتراضي (لمن لا فرع له في الملف)')+'</select>':'')+'</div><label for="cpaste" style="margin-top:8px">أو الصق البيانات هنا</label><textarea id="cpaste" rows="4"></textarea><div class="pay"><button class="btn" id="cchk">فحص</button><button class="btn am" id="cgo" disabled>استيراد</button></div><div id="cres"></div></details>':'';
+ v.innerHTML='<div class="k">'+['all','active','late','legal','closed','inquiry'].map(function(k){return '<div><b>'+cnt[k]+'</b><span>'+CU_CATS[k]+'</span></div>'}).join('')+'</div>'+form+imp+
+  '<div class="card"><h2>العملاء</h2><div class="f"><div><label for="fc">الفئة</label><select id="fc">'+Object.keys(CU_CATS).map(function(k){return '<option value="'+k+'"'+(F.cat==k?' selected':'')+'>'+CU_CATS[k]+' ('+cnt[k]+')</option>'}).join('')+'</select></div><div><label for="fb">الفرع</label><select id="fb">'+opts(S.branches,'id','name',F.br,'كل الفروع')+'</select></div><div><label for="fz">المنطقة</label><select id="fz">'+opts(S.zones,'id','name',F.zn,'كل المناطق')+'</select></div><div><label for="fh">نوع السكن</label><select id="fh"><option value="">الكل</option><option value="owned"'+(F.hs=='owned'?' selected':'')+'>تمليك</option><option value="old_rent"'+(F.hs=='old_rent'?' selected':'')+'>إيجار قديم</option></select></div><div><label for="fm">موافقة التسويق</label><select id="fm"><option value="">الكل</option><option value="1"'+(F.mk=='1'?' selected':'')+'>موافق</option><option value="0"'+(F.mk=='0'?' selected':'')+'>غير موافق</option></select></div><div><label for="cq">بحث بالاسم أو الهاتف أو الرقم القومي أو الكود</label><input id="cq" value="'+esc(F.q)+'"></div></div><div class="row" style="margin-top:8px"><span class="hint" id="cn0"></span><span class="pay" style="margin:0"><button class="btn sm" id="cex">تصدير النتائج CSV</button><button class="btn sm" id="ccp">نسخ للصق في جوجل شيت</button></span></div><div class="wrap"><table id="ct"></table></div><div id="cmore"></div></div>';
+ function draw(){var L=filt(),lim=F.pg*100;$('#cn0').textContent=L.length+' عميل مطابق';
+  $('#ct').innerHTML='<tr><th>الكود</th><th>الاسم</th><th>الهاتف</th><th>الرقم القومي</th><th>المنطقة</th><th>الفرع</th><th>الحالة</th><th>الدخل</th><th></th></tr>'+L.slice(0,lim).map(function(r){return '<tr><td>'+esc(r.code)+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.phone)+'</td><td>'+esc(r.nid)+'</td><td>'+esc(r.zone)+'</td><td>'+esc(r.branch)+'</td><td>'+tg(r.label,r.f.legal||r.f.late?'t2':r.f.active?'t0':r.f.inquiry?'t1':'')+'</td><td>'+(r.income==null?'—':n(r.income))+'</td><td>'+(canNew&&r.kind=='c'?'<button class="btn sm" data-ed="'+r.c.id+'">تعديل</button>':'')+'</td></tr>'}).join('');
+  $('#cmore').innerHTML=L.length>lim?'<div class="pay"><button class="btn" id="cmb">عرض المزيد ('+(L.length-lim)+')</button></div>':'';return L}
+ draw();
+ function exp(sep){var L=filt(),head=['كود العميل','الاسم','الهاتف','الرقم القومي','العنوان','المنطقة','الفرع','نوع السكن','الدخل الشهري','الحالة','عدد العقود','موافقة تسويق'];
+  return [head.join(sep)].concat(L.map(function(r){return [r.code,r.name,r.phone,r.nid,r.addr,r.zone,r.branch,r.housing=='owned'?'تمليك':r.housing=='old_rent'?'إيجار قديم':'',r.income==null?'':r.income,r.label,r.n,r.consent?'نعم':'لا'].map(function(x){x=String(x==null?'':x).replace(/[\t\r\n]+/g,' ');return sep==','?cuQ(x):x}).join(sep)})).join('\r\n')}
+ var plan=null;
+ v.onchange=function(e){var t=e.target,m={fc:'cat',fb:'br',fz:'zn',fh:'hs',fm:'mk'};if(m[t.id]){F[m[t.id]]=t.value;F.pg=1;draw()}
+  if(t.id=='cfile'&&t.files[0]){var fr=new FileReader();fr.onload=function(){$('#cpaste').value=fr.result;$('#cchk').click()};fr.readAsText(t.files[0],'utf-8')}};
+ v.oninput=function(e){if(e.target.id=='cq'){F.q=e.target.value;F.pg=1;draw()}};
+ v.onclick=async function(e){var t=e.target,a;
+  if(t.id=='cmb'){F.pg++;return draw()}
+  if((a=t.getAttribute('data-ed'))){S.cedit=a;return vCust()}
+  if(t.id=='cx'){S.cedit=null;return vCust()}
+  if(t.id=='cex'){var L=filt();if(!L.length)return msg('لا توجد نتائج للتصدير',1);return dl('العملاء-'+today+'.csv',exp(','))}
+  if(t.id=='ccp'){var tx=exp('\t');try{await navigator.clipboard.writeText(tx);msg('تم النسخ. افتح جوجل شيت والصق في الخلية A1')}catch(x){msg('تعذر النسخ، استخدم زر التصدير',1)}return}
+  if(t.id=='ct0')return cuTemplate();
+  if(t.id=='cs'){
+   var o={full_name:$('#cn').value.trim().replace(/\s+/g,' '),phone:cuDig($('#cp').value).trim()||null,national_id:cuDig($('#ci').value).trim()||null,customer_code:$('#cc2').value.trim()||null,address:$('#ca').value.trim()||null,zone_id:$('#cz').value||null,housing:$('#ch').value||null,monthly_income:$('#cm').value?+$('#cm').value:null,marketing_consent:$('#cc').checked};
+   var er=cuCheck(o);if(er.length)return msg(er.join('، '),1);
+   o.consent_at=o.marketing_consent?(edit&&edit.consent_at||new Date().toISOString()):null;
+   var x;if(edit)x=await sb.from('customers').update(o).eq('id',edit.id);
+   else{var bid=role=='system_admin'?$('#cb').value:S.me.branch_id;if(!bid)return msg('حدد الفرع',1);o.branch_id=bid;x=await sb.from('customers').insert(o)}
+   if(x.error)return msg(/customers_nid_uq/.test(x.error.message)?'الرقم القومي مسجل لعميل آخر':/customers_code_uq/.test(x.error.message)?'الكود مسجل لعميل آخر':em(x.error),1);
+   S.cedit=null;msg('تم الحفظ');return vCust()}
+  if(t.id=='cchk'){
+   var rs=cuParse($('#cpaste').value);if(rs.length<2)return msg('لا توجد بيانات. تأكد من صف العناوين وصفوف العملاء',1);
+   var hd=rs[0].map(function(h){return cuNorm(h)}),ix={};
+   [['code','كود العميل','الكود','code'],['name','الاسم','اسم العميل','name'],['phone','الهاتف','الموبايل','رقم الهاتف','phone'],['nid','الرقم القومي','nid'],['addr','العنوان','address'],['zone','المنطقة','zone'],['hs','نوع السكن','السكن','housing'],['inc','الدخل الشهري','الدخل','income'],['br','الفرع','branch'],['mk','موافقة تسويق','التسويق','consent']].forEach(function(m){for(var j=1;j<m.length;j++){var p=hd.indexOf(cuNorm(m[j]));if(p>=0){ix[m[0]]=p;break}}});
+   if(ix.name==null)return msg('لم أجد عمود «الاسم» في صف العناوين',1);
+   var defBr=role=='system_admin'?($('#cib')&&$('#cib').value):S.me.branch_id,ok=[],bad=[],seenN={},seenC={},warnZ=0,zmap={},bmap={};
+   S.zones.forEach(function(z){zmap[cuNorm(z.name)]=z.id});S.branches.forEach(function(b){bmap[cuNorm(b.name)]=b.id});
+   var exN={},exC={};C.forEach(function(c){if(c.national_id)exN[c.national_id]=1;if(c.customer_code)exC[c.customer_code]=1});
+   rs.slice(1).forEach(function(r,k){var g=function(key){return ix[key]==null?'':String(r[ix[key]]==null?'':r[ix[key]]).trim()},er=[];
+    var ph=cuDig(g('phone')).replace(/[^0-9]/g,''),ni=cuDig(g('nid')).replace(/[^0-9]/g,'');if(/^1[0-9]{9}$/.test(ph))ph='0'+ph;
+    var o={full_name:g('name').replace(/\s+/g,' '),phone:ph||null,national_id:ni||null,customer_code:g('code')||null,address:g('addr')||null,monthly_income:g('inc')?+cuDig(g('inc')).replace(/[^0-9.]/g,'')||null:null};
+    var z=g('zone');if(z){o.zone_id=zmap[cuNorm(z)]||null;if(!o.zone_id)warnZ++}
+    var h=cuNorm(g('hs'));if(h){if(/تمليك|owned/i.test(h))o.housing='owned';else if(/ايجار|old_rent/i.test(h))o.housing='old_rent';else er.push('نوع السكن غير معروف')}
+    var mk=cuNorm(g('mk'));o.marketing_consent=/^(نعم|yes|y|1|true|موافق)$/i.test(mk);o.consent_at=o.marketing_consent?new Date().toISOString():null;
+    var bs=g('br');if(bs){o.branch_id=bmap[cuNorm(bs)];if(!o.branch_id)er.push('الفرع غير معروف')}else o.branch_id=defBr;
+    if(o.branch_id&&role!='system_admin'&&o.branch_id!=S.me.branch_id)er.push('فرع غير مسموح لك');
+    if(!o.branch_id&&!er.length)er.push('الفرع غير محدد');
+    er=er.concat(cuCheck(o));
+    if(o.national_id&&(exN[o.national_id]||seenN[o.national_id]))er.push('الرقم القومي مكرر');
+    if(o.customer_code&&(exC[o.customer_code]||seenC[o.customer_code]))er.push('الكود مكرر');
+    if(er.length)bad.push({r:r,e:er.join(' + '),line:k+2});else{ok.push(o);if(o.national_id)seenN[o.national_id]=1;if(o.customer_code)seenC[o.customer_code]=1}});
+   plan={ok:ok,bad:bad,head:rs[0]};
+   $('#cres').innerHTML='<div class="alert '+(bad.length?'bad':'ok')+'">جاهز للاستيراد: <b>'+ok.length+'</b> · مرفوض: <b>'+bad.length+'</b>'+(warnZ?' · مناطق غير معروفة (ستُترك فارغة): '+warnZ:'')+'</div>'+(bad.length?'<div class="wrap"><table><tr><th>الصف</th><th>الاسم</th><th>السبب</th></tr>'+bad.slice(0,30).map(function(b){return '<tr><td>'+b.line+'</td><td>'+esc(b.r[ix.name]||'')+'</td><td>'+esc(b.e)+'</td></tr>'}).join('')+'</table></div>'+(bad.length>30?'<p class="hint">يظهر أول 30 فقط.</p>':'')+'<div class="pay"><button class="btn" id="cbad">تنزيل الصفوف المرفوضة لتصحيحها</button></div>':'');
+   $('#cgo').disabled=!ok.length;$('#cgo').textContent='استيراد '+ok.length+' عميل';return}
+  if(t.id=='cbad'&&plan){return dl('صفوف-مرفوضة.csv',[plan.head.map(cuQ).concat(['سبب الرفض']).join(',')].concat(plan.bad.map(function(b){return b.r.map(cuQ).concat([cuQ(b.e)]).join(',')})).join('\r\n'))}
+  if(t.id=='cgo'&&plan&&plan.ok.length){
+   t.disabled=true;var done=0,fail=[],i,b,x,j;
+   for(i=0;i<plan.ok.length;i+=200){b=plan.ok.slice(i,i+200);x=await sb.from('customers').insert(b);
+    if(!x.error)done+=b.length;else for(j=0;j<b.length;j++){var y=await sb.from('customers').insert(b[j]);if(y.error)fail.push((b[j].full_name||'')+': '+em(y.error));else done++}
+    $('#cres').innerHTML='<p class="hint">جارٍ الاستيراد… '+done+' / '+plan.ok.length+'</p>'}
+   plan=null;msg('تم استيراد '+done+' عميل'+(fail.length?' وتعذر '+fail.length:''),fail.length>0);
+   if(fail.length){$('#cres').innerHTML='<div class="alert bad">تعذر: '+fail.slice(0,10).map(esc).join(' · ')+'</div>';return}
+   return vCust()}
+ }
 }
 
 /* ---------- contracts ---------- */
@@ -138,13 +248,13 @@ async function vCon(){
  var r=await Promise.all([sb.from('contracts').select('*,customers(full_name),products(name)').order('created_at',{ascending:false}).limit(300),sb.from('customers').select('id,full_name,branch_id').order('full_name').limit(1500)]);
  if(r[0].error)throw r[0].error;
  var role=S.me.role,canNew=['system_admin','branch_manager','sales'].indexOf(role)>=0,v=$('#v'),cu=r[1].data||[];
- var form=canNew?'<div class="card"><h2>عقد جديد (مسودة)</h2><div class="f"><div><label for="kc">العميل</label><select id="kc">'+opts(cu,'id','full_name','','اختر')+'</select></div><div><label for="kp">المنتج</label><select id="kp">'+opts(S.products,'id',function(p){return p.name+' ('+p.annual_rate+'%)'},'','اختر')+'</select></div><div><label for="kr">السعر</label><input id="kr" type="number" min="0"></div><div><label for="kd">المقدم</label><input id="kd" type="number" min="0" value="0"></div><div><label for="km">المدة (أشهر)</label><input id="km" type="number" min="3" max="24" value="12"></div><div><label for="ka">الفائدة السنوية %</label><input id="ka" type="number" step="0.1" value="0"></div><div><label for="kt">طريقة الحساب</label><select id="kt"><option value="flat">ثابتة على الأصل</option><option value="reducing">متناقصة</option></select></div></div><p class="hint" id="kv"></p><button class="btn am" id="ks">حفظ كمسودة</button></div>':'';
- v.innerHTML=form+'<div class="card"><h2>العقود</h2><div class="wrap"><table><tr><th>العميل</th><th>المنتج</th><th>الإجمالي</th><th>القسط</th><th>المدة</th><th>الحالة</th><th></th></tr>'+r[0].data.map(function(c){
+ var form=canNew?'<div class="card"><h2>عقد جديد (مسودة)</h2><div class="f"><div><label for="kc">العميل</label><select id="kc">'+opts(cu,'id','full_name','','اختر')+'</select></div><div><label for="kcode">كود العقد (نفس كود العميل)</label><input id="kcode" maxlength="40"></div><div><label for="kp">المنتج</label><select id="kp">'+opts(S.products,'id',function(p){return p.name+' ('+p.annual_rate+'%)'},'','اختر')+'</select></div><div><label for="kr">السعر</label><input id="kr" type="number" min="0"></div><div><label for="kd">المقدم</label><input id="kd" type="number" min="0" value="0"></div><div><label for="km">المدة (أشهر)</label><input id="km" type="number" min="3" max="24" value="12"></div><div><label for="ka">الفائدة السنوية %</label><input id="ka" type="number" step="0.1" value="0"></div><div><label for="kt">طريقة الحساب</label><select id="kt"><option value="flat">ثابتة على الأصل</option><option value="reducing">متناقصة</option></select></div></div><p class="hint" id="kv"></p><button class="btn am" id="ks">حفظ كمسودة</button></div>':'';
+ v.innerHTML=form+'<div class="card"><h2>العقود</h2><div class="wrap"><table><tr><th>الكود</th><th>العميل</th><th>المنتج</th><th>الإجمالي</th><th>القسط</th><th>المدة</th><th>الحالة</th><th></th></tr>'+r[0].data.map(function(c){
   var a='';
   if(c.status=='draft'&&['system_admin','branch_manager'].indexOf(role)>=0)a='<button class="btn sm" data-id="'+c.id+'" data-st="pending_credit">إرسال للائتمان</button>';
   if(c.status=='pending_credit'&&role=='credit_manager')a='<button class="btn sm am" data-id="'+c.id+'" data-st="approved">اعتماد</button> <button class="btn sm rd" data-id="'+c.id+'" data-st="rejected">رفض</button>';
   if(c.status=='approved'&&role=='system_admin')a='<button class="btn sm am" data-id="'+c.id+'" data-st="active">اعتماد العقد النهائي</button>';
-  return '<tr><td>'+esc(c.customers&&c.customers.full_name)+'</td><td>'+esc(c.products&&c.products.name)+'</td><td>'+n(c.total)+'</td><td>'+n(c.installment)+'</td><td>'+c.months+'</td><td><span class="tag">'+ST[c.status]+'</span></td><td>'+a+'</td></tr>'}).join('')+'</table></div><p class="hint">القرار الائتماني لمدير الائتمان، والعقد النهائي لمدير النظام.</p></div>';
+  return '<tr><td>'+esc(c.code)+'</td><td>'+esc(c.customers&&c.customers.full_name)+'</td><td>'+esc(c.products&&c.products.name)+'</td><td>'+n(c.total)+'</td><td>'+n(c.installment)+'</td><td>'+c.months+'</td><td><span class="tag">'+ST[c.status]+'</span></td><td>'+a+'</td></tr>'}).join('')+'</table></div><p class="hint">القرار الائتماني لمدير الائتمان، والعقد النهائي لمدير النظام.</p></div>';
  v.onclick=async function(e){var id=e.target.getAttribute('data-id'),st=e.target.getAttribute('data-st');if(!id)return;
   var u={status:st};if(st=='approved'||st=='rejected')u.credit_note=prompt('ملاحظة القرار (اختياري)')||null;
   var x=await sb.from('contracts').update(u).eq('id',id);if(x.error)return msg(em(x.error),1);msg('تم التحديث');vCon()};
@@ -154,7 +264,7 @@ async function vCon(){
  $('#kp').onchange=function(){var p=S.products.filter(function(x){return x.id==$('#kp').value})[0];if(p){$('#ka').value=p.annual_rate;pv()}};
  $('#ks').onclick=async function(){
   var c=cu.filter(function(x){return x.id==$('#kc').value})[0];if(!c)return msg('اختر العميل',1);
-  var x=await sb.from('contracts').insert({branch_id:c.branch_id,customer_id:c.id,product_id:$('#kp').value||null,price:+$('#kr').value,down_payment:+$('#kd').value||0,months:+$('#km').value,annual_rate:+$('#ka').value||0,method:$('#kt').value,status:'draft'});
+  var x=await sb.from('contracts').insert({branch_id:c.branch_id,customer_id:c.id,code:$('#kcode').value.trim()||null,product_id:$('#kp').value||null,price:+$('#kr').value,down_payment:+$('#kd').value||0,months:+$('#km').value,annual_rate:+$('#ka').value||0,method:$('#kt').value,status:'draft'});
   if(x.error)return msg(em(x.error),1);msg('تم حفظ المسودة');vCon()}
 }
 
