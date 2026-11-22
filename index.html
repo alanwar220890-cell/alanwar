@@ -315,6 +315,8 @@ async function vCon(){
   if(c.status=='draft'&&['system_admin','branch_manager'].indexOf(role)>=0)a+='<button class="btn sm" data-id="'+c.id+'" data-st="pending_credit">إرسال للائتمان</button>';
   if(c.status=='pending_credit'&&role=='credit_manager')a+='<button class="btn sm am" data-id="'+c.id+'" data-st="approved">اعتماد</button> <button class="btn sm rd" data-id="'+c.id+'" data-st="rejected">رفض</button>';
   if(c.status=='approved'&&role=='system_admin')a+='<button class="btn sm am" data-id="'+c.id+'" data-st="active">اعتماد العقد النهائي</button>';
+  if(c.status=='pending_credit'&&role!='credit_manager')a+='<span class="hint">بانتظار قرار مسؤول الائتمان</span>';
+  if(c.status=='approved'&&role!='system_admin')a+='<span class="hint">بانتظار اعتماد المدير العام</span>';
   return '<tr><td>'+esc(c.code)+'</td><td>'+esc(c.customers&&c.customers.full_name)+'</td><td>'+esc(c.product_name||(c.products&&c.products.name))+'</td><td>'+n(c.total)+'</td><td>'+n(c.installment)+'</td><td>'+c.months+'</td><td><span class="tag">'+ST[c.status]+'</span></td><td>'+a+'</td></tr>'}).join('')+'</table></div>'+(L.length>200?'<p class="hint">يظهر أول 200 عقد، استخدم البحث.</p>':'')+'<p class="hint">القرار الائتماني لمسؤول الائتمان، والعقد النهائي للمدير العام.</p></div>';
  var cur=null;
  v.oninput=function(e){var t=e.target;
@@ -511,6 +513,7 @@ async function vInv(){
    h+='<div class="f" style="margin-top:8px"><div><label for="cr'+i.id+'">التوصية</label><select id="cr'+i.id+'"><option value="">اختر</option>'+Object.keys(CR).map(function(k){return '<option value="'+k+'"'+(i.credit_recommendation==k?' selected':'')+'>'+CR[k]+'</option>'}).join('')+'</select></div></div><label for="cs'+i.id+'" style="margin-top:6px">الأسباب (إلزامية عند الرفض)</label><textarea id="cs'+i.id+'" rows="2">'+esc(i.credit_reasons)+'</textarea><label for="cn'+i.id+'" style="margin-top:6px">ملاحظة</label><input id="cn'+i.id+'" value="'+esc(i.credit_note)+'"><div class="pay"><button class="btn am" data-dec="'+i.id+'" data-d="approved">موافقة</button><button class="btn rd" data-dec="'+i.id+'" data-d="rejected">رفض</button></div><label for="rr'+i.id+'" style="margin-top:6px">أو إرجاع الطلب (اكتب السبب)</label><div class="pay"><input id="rr'+i.id+'"><button class="btn" data-ret="'+i.id+'" data-to="visit">إرجاع للزيارة</button><button class="btn" data-ret="'+i.id+'" data-to="documents">إرجاع للمستندات</button></div>'}
   else if(i.credit_recommendation)h+='<div class="hint">التوصية: '+CR[i.credit_recommendation]+(i.credit_reasons?' · '+esc(i.credit_reasons):'')+(i.credit_note?' · '+esc(i.credit_note):'')+'</div>';
   if(i.credit_decision)h+='<div class="alert ok">القرار: '+CD[i.credit_decision]+' · '+esc(un(i.decided_by))+' · '+fd(i.decided_at)+'</div>';
+  if(i.status=='approved'&&creator)h+='<div class="pay"><button class="btn am" data-mkc="'+i.id+'">إنشاء العميل وفتح عقد</button></div><p class="hint">ينشئ سجل العميل من بيانات الاستعلام، ثم تختار المنطقة وتحفظ، وبعدها يظهر في قائمة العقود.</p>';
   if(i.ai_summary)h+='<div class="hint">تحليل الذكاء الاصطناعي: '+esc(i.ai_summary)+'</div>';
   if(act&&creator&&(role!='sales'||i.created_by==S.me.id))h+='<div class="pay"><input id="cxr'+i.id+'" placeholder="سبب الإلغاء"><button class="btn rd" data-cx="'+i.id+'">إلغاء الطلب</button></div>';
   var ev=EV.filter(function(x){return x.investigation_id==i.id});
@@ -530,6 +533,12 @@ async function vInv(){
    var up=await sb.storage.from('inv-docs').upload(path,f,{contentType:f.type||undefined});if(up.error)return msg(em(up.error),1);
    var ins=await sb.from('investigation_docs').insert({investigation_id:a,doc_type:$('#dt'+a).value,file_path:path,file_name:f.name});
    if(ins.error){await sb.storage.from('inv-docs').remove([path]);return msg(em(ins.error),1)}msg('تم رفع المستند');return vInv()}
+  if((a=t.getAttribute('data-mkc'))){var iv=L.filter(function(x){return x.id==a})[0];if(!iv)return;
+   var ex=await sb.from('customers').select('id').eq('national_id',iv.national_id).limit(1);if(ex.error)return msg(em(ex.error),1);
+   var cid=ex.data&&ex.data[0]&&ex.data[0].id;
+   if(!cid){var ins=await sb.from('customers').insert({branch_id:iv.branch_id,full_name:String(iv.customer_name||'').trim().replace(/\s+/g,' '),phone:iv.customer_phone||null,national_id:iv.national_id,address:[iv.customer_address,iv.address_details].filter(Boolean).join(' - ')||null,housing:iv.housing||null,monthly_income:iv.monthly_income||null}).select('id').single();
+    if(ins.error)return msg(/customers_name_4/.test(ins.error.message)?'اسم العميل أقل من 4 كلمات. عدّله في بيانات الطلب أو في العملاء':/customers_phone_fmt/.test(ins.error.message)?'رقم الهاتف غير صحيح (حتى 11 رقمًا)':em(ins.error),1);cid=ins.data.id}
+   S.cedit=cid;msg('تم إنشاء العميل. اختر المنطقة واحفظ ثم افتح العقود');return go('cust')}
   if((a=t.getAttribute('data-sva')))return go2(a,appVals(a));
   if((a=t.getAttribute('data-tov'))){var o=appVals(a);o.status='visit';return go2(a,o)}
   if((a=t.getAttribute('data-cx'))){var rs=$('#cxr'+a).value.trim();if(!rs)return msg('اكتب سبب الإلغاء',1);if(!confirm('تأكيد إلغاء الطلب؟'))return;return go2(a,{status:'cancelled',cancel_reason:rs})}
