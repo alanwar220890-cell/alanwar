@@ -53,6 +53,10 @@ details.card>summary{cursor:pointer;list-style:none}details.card>summary::-webki
 @media print{@page{size:A4;margin:12mm}body.printing>*:not(#pv){display:none!important}body.printing #pv{display:block!important;background:#fff;color:#000}body.printing{background:#fff}#pv .kv th,#pv .kv td{border:1px solid #999;padding:3px 6px;color:#000;font-size:12px}#pv .pb{border-color:#999}#pv a{color:#000;text-decoration:none}#pv .cfile h3{border-color:#000}}
 .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:10px}.two .pb{height:100%}.pb .kv th{width:34%}.md{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20;overflow:auto;padding:12px}.md>.card{max-width:960px;margin:0 auto}
 :focus-visible{outline:2px solid var(--am);outline-offset:2px}
+.pgx{border:1px solid var(--ln);border-radius:10px;padding:8px 10px;margin-top:8px}.pgx>b,.pgx .pgh b{display:flex;align-items:center;gap:6px}.pgh{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.pchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.pchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--ln);border-radius:999px;padding:5px 10px;font-size:13px;background:var(--bg);color:var(--mu);cursor:pointer;font:inherit;font-size:13px}
+.pchip.on{background:var(--am);border-color:var(--am);color:#fff}.pchip[disabled]{cursor:default;opacity:.85}.pchip i{width:30px;height:16px;border-radius:9px;background:var(--ln);position:relative;flex:none}.pchip i:after{content:'';position:absolute;top:2px;right:2px;width:12px;height:12px;border-radius:50%;background:#fff;transition:.15s}.pchip.on i{background:rgba(255,255,255,.45)}.pchip.on i:after{right:16px}
+.ulist td{vertical-align:middle}.ulist .em{direction:ltr;text-align:right;font-size:12px;color:var(--mu)}
 </style>
 </head>
 <body>
@@ -72,6 +76,26 @@ var RL={sales:'موظف مبيعات',collector:'موظف تحصيل',branch_man
 var ST={legal:'شؤون قانونية',draft:'مسودة',pending_credit:'بانتظار الائتمان',approved:'معتمد ائتمانيًا',rejected:'مرفوض',active:'ساري',closed:'مغلق'};
 var CT={regular:['منتظم','t0'],due:['مستحق','t1'],late:['متأخر +30','t2'],defaulted:['متعثر +60','t2'],bad:['سيئ +90','t2']};
 var today=new Date().toISOString().slice(0,10);
+/* ---------- الصلاحيات ---------- */
+var PI={eye:'<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/>',plus:'<path d="M12 5v14M5 12h14"/>',upload:'<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>',send:'<path d="M4 12l16-8-6 16-3-7z"/>',check:'<path d="M5 12l5 5L20 7"/>',shield:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',note:'<path d="M5 4h14v12l-4 4H5z"/><path d="M9 9h6M9 13h4"/>',print:'<path d="M7 9V4h10v5M7 17H5v-6h14v6h-2M8 14h8v6H8z"/>',cash:'<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/>',undo:'<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/>',scale:'<path d="M12 4v16M6 20h12M5 8h14M7 8l-3 6h6zM17 8l-3 6h6z"/>',user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/>',pin:'<path d="M12 21s-7-6.5-7-12a7 7 0 0114 0c0 5.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/>',x:'<path d="M6 6l12 12M18 6L6 18"/>',globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/>',chart:'<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',task:'<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12l3 3 5-6"/>',bot:'<rect x="5" y="8" width="14" height="11" rx="2"/><path d="M12 4v4M9 13h.01M15 13h.01"/>',mega:'<path d="M3 11v2l13 5V6zM16 9a3 3 0 010 6M6 13l1 6h3l-1-5"/>',book:'<path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2z"/><path d="M4 19V5"/>',link:'<path d="M10 14a4 4 0 006 0l3-3a4 4 0 00-6-6l-1 1M14 10a4 4 0 00-6 0l-3 3a4 4 0 006 6l1-1"/>',lock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>'};
+function pico(k){return '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(PI[k]||PI.check)+'</svg>'}
+var PG=[
+ {t:'عام',ic:'globe',p:[['all_branches','يرى ويعمل على كل الفروع (بدونها يشتغل على فرعه بس)','globe'],['dash.view','لوحة التحكم','chart']]},
+ {t:'العملاء',ic:'user',p:[['cust.view','عرض العملاء','eye'],['cust.edit','إضافة وتعديل العملاء','edit'],['cust.import','استيراد العملاء من شيت','upload']]},
+ {t:'العقود',ic:'note',p:[['con.view','عرض العقود','eye'],['con.create','إنشاء وتفعيل عقد جديد','plus'],['con.manual','عقد قديم بقسط يدوي أو منتهي، وتعديل بيانات العقد','edit'],['con.send_credit','إرسال العقد للائتمان','send'],['con.credit','اعتماد أو رفض العقد ائتمانيًا','check'],['con.final','الاعتماد النهائي للعقد','shield'],['con.notes','تعديل ملاحظات البيعة','note'],['con.receipts','إيصالات الأمانة وعناوين البطاقة','print']]},
+ {t:'التحصيل',ic:'cash',p:[['coll.view','عرض التحصيل والمتأخرين','eye'],['coll.pay','تسجيل تحصيل','cash'],['coll.cancel','إلغاء تحصيل','undo'],['coll.refer','تحويل العميل للشؤون القانونية','scale']]},
+ {t:'الاستعلامات',ic:'pin',p:[['inv.create','رفع طلب الاستعلام ومستنداته وإرساله للزيارة','plus'],['inv.assign','إسناد الزيارة الميدانية لمسؤول','user'],['inv.visit','تنفيذ الاستعلام الميداني','pin'],['inv.credit','قرار الائتمان: موافقة أو رفض أو إرجاع','check'],['inv.cancel','إلغاء طلب الاستعلام','x'],['inv.view','عرض كل طلبات الاستعلام (مش طلباته بس)','eye']]},
+ {t:'الشؤون القانونية',ic:'scale',p:[['legal.view','عرض كل القضايا (مش المسندة ليه بس)','eye'],['legal.work','العمل على القضايا: ملاحظات ومواعيد اتفاق','note'],['legal.status','تغيير حالة القضية وإنهاؤها','check'],['legal.reassign','نقل القضية لمسؤول آخر','user']]},
+ {t:'المبيعات',ic:'chart',p:[['leads.view','عرض العملاء المحتملين','eye'],['leads.edit','إضافة وتحديث العملاء المحتملين','edit'],['leads.assign','توزيع العملاء المحتملين على الموظفين','user']]},
+ {t:'المستهدفات والمهام',ic:'target',p:[['tgt.view','عرض المستهدفات','eye'],['tgt.edit','تحديد المستهدفات','target'],['task.view','المهام','task'],['task.assign','إسناد مهام لموظفين آخرين ومتابعتها','user']]},
+ {t:'أقسام أخرى',ic:'book',p:[['fin.view','المالية والأداء','chart'],['ai.view','المساعد الذكي','bot'],['camp.manage','التسويق','mega'],['kb.manage','مركز المعرفة','book'],['integ.manage','الربط','link']]}];
+var PALL=[].concat.apply([],PG.map(function(g){return g.p.map(function(x){return x[0]})}));
+function can(k){return S.me&&S.me.role=='system_admin'||(S.perms||[]).indexOf(k)>=0}
+function canAny(a){return a.some(can)}
+function effPerms(p){if(!p)return [];if(p.role=='system_admin')return PALL.slice();return p.perms||(S.pdef&&S.pdef[p.role])||[]}
+function pcan(p,k){return effPerms(p).indexOf(k)>=0}
+function pickBr(){return can('all_branches')||!S.me.branch_id}
+function dname(p){var x=p&&p.full_name;return x&&!/@/.test(x)?x:'(بدون اسم)'}
 
 /* ---------- boot / login ---------- */
 async function boot(){
@@ -85,29 +109,52 @@ async function boot(){
  if(!S.me.active){APP.innerHTML='<div class="card login"><h2>حسابك غير مفعّل</h2><p class="hint">اطلب من مدير النظام تفعيل حسابك وتحديد فرعك ودورك.</p><button class="btn" id="lo">خروج</button></div>';$('#lo').onclick=out;return}
  var r=await Promise.all([sb.from('zones').select('*').order('name'),sb.from('branches').select('*').order('name'),sb.from('products').select('*').order('name')]);
  S.zones=r[0].data||[];S.branches=r[1].data||[];S.products=r[2].data||[];
- S.profiles=(await sb.from('profiles').select('id,full_name,role,branch_id,active')).data||[];
- shell();go(S.nav[0])
+ await loadMe(p.data);
+ shell();go(S.nav[0]);live()
+}
+async function loadMe(me){
+ var r=await Promise.all([sb.rpc('my_perms'),sb.rpc('perm_defaults'),sb.from('profiles').select('id,full_name,role,branch_id,active,perms')]);
+ S.me=me;S.me.full_name=dname(me);S.perms=r[0].data||[];S.pdef=r[1].data||{};
+ S.profiles=(r[2].data||[]).map(function(x){x.full_name=dname(x);return x});
+ S.sig=[S.me.role,S.me.branch_id,S.me.full_name,S.me.active,S.perms.slice().sort().join(',')].join('|')
+}
+async function refreshMe(){
+ if(!S.me||!sb)return;var p=await sb.from('profiles').select('*').eq('id',S.me.id).single();if(p.error||!p.data)return;
+ if(!p.data.active)return boot();
+ var old=S.sig;await loadMe(p.data);
+ if(old!==S.sig){var cur=S.cur;shell();go(S.nav.indexOf(cur)>=0?cur:S.nav[0]);msg('تم تحديث صلاحياتك')}
+}
+function live(){
+ try{if(S.ch)sb.removeChannel(S.ch);S.ch=sb.channel('me-'+S.me.id).on('postgres_changes',{event:'UPDATE',schema:'public',table:'profiles',filter:'id=eq.'+S.me.id},function(){refreshMe()}).subscribe()}catch(e){}
+ clearInterval(S.pt);S.pt=setInterval(refreshMe,60000);
+ if(!live.b){live.b=1;document.addEventListener('visibilitychange',function(){if(!document.hidden)refreshMe()})}
 }
 function loginView(m){
  APP.innerHTML='<div class="card login"><div class="lg"><img src="logo.png" alt="شعار الأنوار" onerror="this.style.display=\'none\'"><div class="lgt">ALANWAR AI</div><div class="hint">نظام الأنوار لإدارة البيع بالتقسيط</div></div><h2 style="text-align:center">تسجيل الدخول</h2>'+(m?'<p class="hint">'+esc(m)+'</p>':'')+'<label for="em">البريد الإلكتروني</label><input id="em" type="email" autocomplete="username"><label for="pw" style="margin-top:8px">كلمة المرور</label><input id="pw" type="password" autocomplete="current-password"><button class="btn am" id="li" style="margin-top:12px;width:100%">دخول</button></div>';
  $('#li').onclick=async function(){var r=await sb.auth.signInWithPassword({email:$('#em').value.trim(),password:$('#pw').value});if(r.error){var m0=String(r.error.message||'');return msg(/fetch|network|failed/i.test(m0)?'تعذر الاتصال بالخادم (الصفحة محجوبة عن Supabase). افتح الموقع من ملف على جهازك أو من رابط GitHub Pages.':'بيانات الدخول غير صحيحة',1)};boot()};
  $('#pw').onkeydown=function(e){if(e.key=='Enter')$('#li').click()}
 }
-async function out(){await sb.auth.signOut();S.me=null;boot()}
+async function out(){try{if(S.ch)sb.removeChannel(S.ch)}catch(e){}clearInterval(S.pt);await sb.auth.signOut();S.me=null;boot()}
 function shell(){
  var NV={dash:'لوحة التحكم',cust:'العملاء',con:'العقود',coll:'التحصيل',leads:'المبيعات',inv:'الاستعلامات',legal:'الشؤون القانونية والقضايا',tgt:'المستهدفات',task:'المهام',fin:'المالية والأداء',camp:'التسويق',ai:'المساعد الذكي',kb:'مركز المعرفة',integ:'الربط',adm:'الإدارة'};
- var AC={system_admin:Object.keys(NV),credit_manager:['dash','cust','con','inv','legal','task'],branch_manager:['dash','cust','con','coll','legal','leads','inv','tgt','task','fin','ai'],sales:['dash','cust','con','leads','inv','tgt','task'],collector:['dash','cust','coll','legal','task'],field_agent:['inv','task'],lawyer:['legal'],collection_rep:['coll','legal']};
- S.nav=AC[S.me.role]||['dash'];
+ var NP={dash:['dash.view'],cust:['cust.view','cust.edit','cust.import'],con:['con.view','con.create','con.send_credit','con.credit','con.final'],coll:['coll.view','coll.pay'],leads:['leads.view','leads.edit','leads.assign'],inv:['inv.view','inv.create','inv.assign','inv.visit','inv.credit','inv.cancel'],legal:['legal.view','legal.work','legal.status','legal.reassign'],tgt:['tgt.view','tgt.edit'],task:['task.view','task.assign'],fin:['fin.view'],camp:['camp.manage'],ai:['ai.view'],kb:['kb.manage'],integ:['integ.manage']};
+ S.nav=Object.keys(NV).filter(function(k){return k=='adm'?S.me.role=='system_admin':canAny(NP[k]||[])});
  var nav=S.nav.map(function(k){return [k,NV[k]]});
  var br=S.branches.filter(function(b){return b.id==S.me.branch_id})[0];
- APP.innerHTML='<header><div class="top"><b><img src="logo.png" alt="" onerror="this.style.display=\'none\'"><i></i>ALANWAR AI</b><span>'+esc(S.me.full_name||'')+' · '+RL[S.me.role]+(br?' · '+esc(br.name):'')+' <button class="btn sm" id="lo">خروج</button></span></div><div class="tabs">'+nav.map(function(t){return '<button data-v="'+t[0]+'">'+t[1]+'</button>'}).join('')+'</div></header><main id="v"></main>';
- $('#lo').onclick=out;
+ APP.innerHTML='<header><div class="top"><b><img src="logo.png" alt="" onerror="this.style.display=\'none\'"><i></i>ALANWAR AI</b><span><button class="btn sm" id="acc" title="حسابي">'+esc(S.me.full_name)+' · '+RL[S.me.role]+(br?' · '+esc(br.name):'')+'</button> <button class="btn sm" id="lo">خروج</button></span></div><div class="tabs">'+nav.map(function(t){return '<button data-v="'+t[0]+'">'+t[1]+'</button>'}).join('')+'</div></header><main id="v"></main>';
+ $('#lo').onclick=out;$('#acc').onclick=accPanel;
+ if(!S.nav.length)$('#v').innerHTML='<div class="card">لا توجد أقسام متاحة لحسابك حاليًا. اطلب من المدير العام تحديد صلاحياتك.</div>';
  document.querySelectorAll('.tabs button').forEach(function(b){b.onclick=function(){go(b.dataset.v)}})
 }
-function go(v){
+function go(v){if(!v)return;S.cur=v;
  document.querySelectorAll('.tabs button').forEach(function(b){b.classList.toggle('on',b.dataset.v==v)});
  $('#v').onclick=null;$('#v').onchange=null;$('#v').innerHTML='<p class="hint">جارٍ التحميل…</p>';
  ({dash:vDash,cust:vCust,con:vCon,coll:vColl,adm:vAdm,leads:vLeads,inv:vInv,legal:vLegal,tgt:vTgt,task:vTasks,fin:vFin,camp:vCamp,ai:vAI,kb:vKB,integ:vInt})[v]().catch(function(e){$('#v').innerHTML='<div class="card">'+esc(em(e))+'</div>'})
+}
+function accPanel(){
+ var old=$('#cm');if(old)old.remove();var m=document.createElement('div');m.id='cm';m.className='md';var br=bn(S.me.branch_id),mine=effPerms(Object.assign({},S.me,{perms:S.me.role=='system_admin'?null:S.perms}));
+ m.innerHTML='<div class="card"><div class="row"><h2>حسابي</h2><button class="btn" data-clo="1">إغلاق</button></div><table class="kv"><tr><th>الاسم</th><td>'+esc(S.me.full_name)+'</td></tr><tr><th>الوظيفة</th><td>'+esc(RL[S.me.role])+'</td></tr><tr><th>الفرع</th><td>'+(esc(br)||'—')+'</td></tr><tr><th>البريد (لتسجيل الدخول)</th><td dir="ltr" style="text-align:right">'+esc(S.me.email||'—')+'</td></tr></table><h3>صلاحياتي</h3>'+PG.map(function(g){var l=g.p.filter(function(x){return mine.indexOf(x[0])>=0});return l.length?'<div class="pgx"><b>'+pico(g.ic)+' '+g.t+'</b><div class="pchips">'+l.map(function(x){return '<span class="pchip on">'+pico(x[2])+esc(x[1])+'</span>'}).join('')+'</div></div>':''}).join('')+'</div>';
+ document.body.appendChild(m);m.onclick=function(e){if(e.target===m||e.target.getAttribute('data-clo'))m.remove()}
 }
 function bn(id){var b=S.branches.filter(function(x){return x.id==id})[0];return b?b.name:''}
 
@@ -159,7 +206,7 @@ function cuTemplate(){
  dl('قالب-استيراد-العملاء.csv',L.join('\r\n'))}
 async function cuAll(q){var out=[],from=0,r;for(;;){r=await q().range(from,from+999);if(r.error)throw r.error;out=out.concat(r.data||[]);if(!r.data||r.data.length<1000)break;from+=1000}return out}
 async function vCust(){
- var role=S.me.role,canNew=['system_admin','branch_manager','sales'].indexOf(role)>=0,canImp=['system_admin','branch_manager'].indexOf(role)>=0,v=$('#v');
+ var role=S.me.role,canNew=can('cust.edit'),canImp=can('cust.import'),v=$('#v');
  var R=await Promise.all([
   cuAll(function(){return sb.from('customers').select('*,zones(name),branches(name)').order('created_at',{ascending:false})}),
   cuAll(function(){return sb.from('contracts').select('id,customer_id,status,code,created_at')}),
@@ -185,8 +232,8 @@ async function vCust(){
   if(q&&(cuNorm(r.name).toLowerCase().indexOf(q)<0&&r.phone.indexOf(q)<0&&r.nid.indexOf(q)<0&&String(r.code).toLowerCase().indexOf(q)<0))return false;return true})}
  var cnt={};Object.keys(CU_CATS).forEach(function(k){cnt[k]=k=='all'?rows.length:rows.filter(function(r){return r.f[k]}).length});
  var E=edit||{};
- var form=canNew?'<div class="card"><h2>'+(edit?'تعديل عميل':'عميل جديد')+'</h2><div class="f"><div><label for="cn">الاسم (4 كلمات على الأقل)</label><input id="cn" value="'+esc(E.full_name)+'"></div><div><label for="cp">الهاتف (حتى 11 رقمًا)</label><input id="cp" inputmode="numeric" maxlength="11" value="'+esc(E.phone)+'"></div><div><label for="ci">الرقم القومي (حتى 14 رقمًا)</label><input id="ci" inputmode="numeric" maxlength="14" value="'+esc(E.national_id)+'"></div><div><label for="cc2">كود العميل (= كود العقد)</label><input id="cc2" maxlength="40" value="'+esc(E.customer_code)+'"></div><div><label for="cz">المنطقة</label><select id="cz">'+opts(S.zones,'id',function(z){return z.name+' – '+z.governorate},E.zone_id,'اختر')+'</select></div><div><label for="ch">نوع السكن</label><select id="ch"><option value="">اختر</option><option value="old_rent"'+(E.housing=='old_rent'?' selected':'')+'>إيجار قديم</option><option value="owned"'+(E.housing=='owned'?' selected':'')+'>تمليك</option></select></div><div><label for="cm">الدخل الشهري</label><input id="cm" type="number" min="0" value="'+(E.monthly_income==null?'':E.monthly_income)+'"></div>'+(role=='system_admin'&&!edit?'<div><label for="cb">الفرع</label><select id="cb">'+opts(S.branches,'id','name','','اختر')+'</select></div>':'')+'</div><label for="ca" style="margin-top:8px">العنوان بالتفصيل</label><textarea id="ca" rows="4" placeholder="المحافظة، الحي، الشارع، رقم العقار، الدور، الشقة، علامة مميزة">'+esc(E.address)+'</textarea><label for="cia" style="margin-top:8px">عنوان البطاقة <span class="hint">(كما هو مكتوب في البطاقة، ويُطبع في إيصال الأمانة)</span></label><textarea id="cia" rows="2">'+esc(E.id_address)+'</textarea><label style="margin-top:8px"><input type="checkbox" id="cc"'+(E.marketing_consent?' checked':'')+'> موافقة العميل على الرسائل التسويقية</label><div class="pay"><button class="btn am" id="cs">'+(edit?'حفظ التعديل':'حفظ العميل')+'</button>'+(edit?'<button class="btn" id="cx">إلغاء</button>':'')+'</div></div>':'';
- var imp=canImp?'<details class="card"><summary><b>استيراد عملاء من جوجل شيت</b></summary><ol class="hint"><li>نزّل القالب واملأه (أو انسخ بياناتك القديمة في نفس الأعمدة).</li><li>من جوجل شيت: ملف ← تنزيل ← CSV، ثم اختر الملف هنا، أو انسخ الخلايا والصقها في الخانة.</li><li>اضغط «فحص» لمراجعة النتيجة قبل الاستيراد. الصفوف المرفوضة تُنزَّل في ملف لتصحيحها.</li></ol><div class="pay"><button class="btn" id="ct0">تنزيل قالب الاستيراد</button><input type="file" id="cfile" accept=".csv,.txt,.tsv,text/csv" aria-label="ملف CSV">'+(role=='system_admin'?'<select id="cib" aria-label="الفرع الافتراضي">'+opts(S.branches,'id','name','','الفرع الافتراضي (لمن لا فرع له في الملف)')+'</select>':'')+'</div><label for="cpaste" style="margin-top:8px">أو الصق البيانات هنا</label><textarea id="cpaste" rows="4"></textarea><div class="pay"><button class="btn" id="cchk">فحص</button><button class="btn am" id="cgo" disabled>استيراد</button></div><div id="cres"></div></details>':'';
+ var form=canNew?'<div class="card"><h2>'+(edit?'تعديل عميل':'عميل جديد')+'</h2><div class="f"><div><label for="cn">الاسم (4 كلمات على الأقل)</label><input id="cn" value="'+esc(E.full_name)+'"></div><div><label for="cp">الهاتف (حتى 11 رقمًا)</label><input id="cp" inputmode="numeric" maxlength="11" value="'+esc(E.phone)+'"></div><div><label for="ci">الرقم القومي (حتى 14 رقمًا)</label><input id="ci" inputmode="numeric" maxlength="14" value="'+esc(E.national_id)+'"></div><div><label for="cc2">كود العميل (= كود العقد)</label><input id="cc2" maxlength="40" value="'+esc(E.customer_code)+'"></div><div><label for="cz">المنطقة</label><select id="cz">'+opts(S.zones,'id',function(z){return z.name+' – '+z.governorate},E.zone_id,'اختر')+'</select></div><div><label for="ch">نوع السكن</label><select id="ch"><option value="">اختر</option><option value="old_rent"'+(E.housing=='old_rent'?' selected':'')+'>إيجار قديم</option><option value="owned"'+(E.housing=='owned'?' selected':'')+'>تمليك</option></select></div><div><label for="cm">الدخل الشهري</label><input id="cm" type="number" min="0" value="'+(E.monthly_income==null?'':E.monthly_income)+'"></div>'+(pickBr()&&!edit?'<div><label for="cb">الفرع</label><select id="cb">'+opts(S.branches,'id','name','','اختر')+'</select></div>':'')+'</div><label for="ca" style="margin-top:8px">العنوان بالتفصيل</label><textarea id="ca" rows="4" placeholder="المحافظة، الحي، الشارع، رقم العقار، الدور، الشقة، علامة مميزة">'+esc(E.address)+'</textarea><label for="cia" style="margin-top:8px">عنوان البطاقة <span class="hint">(كما هو مكتوب في البطاقة، ويُطبع في إيصال الأمانة)</span></label><textarea id="cia" rows="2">'+esc(E.id_address)+'</textarea><label style="margin-top:8px"><input type="checkbox" id="cc"'+(E.marketing_consent?' checked':'')+'> موافقة العميل على الرسائل التسويقية</label><div class="pay"><button class="btn am" id="cs">'+(edit?'حفظ التعديل':'حفظ العميل')+'</button>'+(edit?'<button class="btn" id="cx">إلغاء</button>':'')+'</div></div>':'';
+ var imp=canImp?'<details class="card"><summary><b>استيراد عملاء من جوجل شيت</b></summary><ol class="hint"><li>نزّل القالب واملأه (أو انسخ بياناتك القديمة في نفس الأعمدة).</li><li>من جوجل شيت: ملف ← تنزيل ← CSV، ثم اختر الملف هنا، أو انسخ الخلايا والصقها في الخانة.</li><li>اضغط «فحص» لمراجعة النتيجة قبل الاستيراد. الصفوف المرفوضة تُنزَّل في ملف لتصحيحها.</li></ol><div class="pay"><button class="btn" id="ct0">تنزيل قالب الاستيراد</button><input type="file" id="cfile" accept=".csv,.txt,.tsv,text/csv" aria-label="ملف CSV">'+(pickBr()?'<select id="cib" aria-label="الفرع الافتراضي">'+opts(S.branches,'id','name','','الفرع الافتراضي (لمن لا فرع له في الملف)')+'</select>':'')+'</div><label for="cpaste" style="margin-top:8px">أو الصق البيانات هنا</label><textarea id="cpaste" rows="4"></textarea><div class="pay"><button class="btn" id="cchk">فحص</button><button class="btn am" id="cgo" disabled>استيراد</button></div><div id="cres"></div></details>':'';
  v.innerHTML='<div class="k">'+['all','active','late','legal','closed','inquiry'].map(function(k){return '<div><b>'+cnt[k]+'</b><span>'+CU_CATS[k]+'</span></div>'}).join('')+'</div>'+form+imp+
   '<div class="card"><h2>العملاء</h2><div class="f"><div><label for="fc">الفئة</label><select id="fc">'+Object.keys(CU_CATS).map(function(k){return '<option value="'+k+'"'+(F.cat==k?' selected':'')+'>'+CU_CATS[k]+' ('+cnt[k]+')</option>'}).join('')+'</select></div><div><label for="fb">الفرع</label><select id="fb">'+opts(S.branches,'id','name',F.br,'كل الفروع')+'</select></div><div><label for="fz">المنطقة</label><select id="fz">'+opts(S.zones,'id','name',F.zn,'كل المناطق')+'</select></div><div><label for="fh">نوع السكن</label><select id="fh"><option value="">الكل</option><option value="owned"'+(F.hs=='owned'?' selected':'')+'>تمليك</option><option value="old_rent"'+(F.hs=='old_rent'?' selected':'')+'>إيجار قديم</option></select></div><div><label for="fm">موافقة التسويق</label><select id="fm"><option value="">الكل</option><option value="1"'+(F.mk=='1'?' selected':'')+'>موافق</option><option value="0"'+(F.mk=='0'?' selected':'')+'>غير موافق</option></select></div><div><label for="cq">بحث بالاسم أو الهاتف أو الرقم القومي أو الكود</label><input id="cq" value="'+esc(F.q)+'"></div></div><div class="row" style="margin-top:8px"><span class="hint" id="cn0"></span><span class="pay" style="margin:0"><button class="btn sm" id="cex">تصدير النتائج CSV</button><button class="btn sm" id="ccp">نسخ للصق في جوجل شيت</button></span></div><div class="wrap"><table id="ct"></table></div><div id="cmore"></div></div>';
  function draw(){var L=filt(),lim=F.pg*100;$('#cn0').textContent=L.length+' عميل مطابق';
@@ -211,7 +258,7 @@ async function vCust(){
    var er=cuCheck(o);if(er.length)return msg(er.join('، '),1);
    o.consent_at=o.marketing_consent?(edit&&edit.consent_at||new Date().toISOString()):null;
    var x;if(edit)x=await sb.from('customers').update(o).eq('id',edit.id);
-   else{var bid=role=='system_admin'?$('#cb').value:S.me.branch_id;if(!bid)return msg('حدد الفرع',1);o.branch_id=bid;x=await sb.from('customers').insert(o)}
+   else{var bid=pickBr()?$('#cb').value:S.me.branch_id;if(!bid)return msg('حدد الفرع',1);o.branch_id=bid;x=await sb.from('customers').insert(o)}
    if(x.error)return msg(/customers_nid_uq/.test(x.error.message)?'الرقم القومي مسجل لعميل آخر':/customers_code_uq/.test(x.error.message)?'الكود مسجل لعميل آخر':em(x.error),1);
    S.cedit=null;msg('تم الحفظ');return vCust()}
   if(t.id=='cchk'){
@@ -219,7 +266,7 @@ async function vCust(){
    var hd=rs[0].map(function(h){return cuNorm(h)}),ix={};
    [['code','كود العميل','الكود','code'],['name','الاسم','اسم العميل','name'],['phone','الهاتف','الموبايل','رقم الهاتف','phone'],['nid','الرقم القومي','nid'],['addr','العنوان','address'],['zone','المنطقة','zone'],['hs','نوع السكن','السكن','housing'],['inc','الدخل الشهري','الدخل','income'],['br','الفرع','branch'],['mk','موافقة تسويق','التسويق','consent']].forEach(function(m){for(var j=1;j<m.length;j++){var p=hd.indexOf(cuNorm(m[j]));if(p>=0){ix[m[0]]=p;break}}});
    if(ix.name==null)return msg('لم أجد عمود «الاسم» في صف العناوين',1);
-   var defBr=role=='system_admin'?($('#cib')&&$('#cib').value):S.me.branch_id,ok=[],bad=[],seenN={},seenC={},warnZ=0,zmap={},bmap={};
+   var defBr=pickBr()?($('#cib')&&$('#cib').value):S.me.branch_id,ok=[],bad=[],seenN={},seenC={},warnZ=0,zmap={},bmap={};
    S.zones.forEach(function(z){zmap[cuNorm(z.name)]=z.id});S.branches.forEach(function(b){bmap[cuNorm(b.name)]=b.id});
    var exN={},exC={};C.forEach(function(c){if(c.national_id)exN[c.national_id]=1;if(c.customer_code)exC[c.customer_code]=1});
    rs.slice(1).forEach(function(r,k){var g=function(key){return ix[key]==null?'':String(r[ix[key]]==null?'':r[ix[key]]).trim()},er=[];
@@ -229,7 +276,7 @@ async function vCust(){
     var h=cuNorm(g('hs'));if(h){if(/تمليك|owned/i.test(h))o.housing='owned';else if(/ايجار|old_rent/i.test(h))o.housing='old_rent';else er.push('نوع السكن غير معروف')}
     var mk=cuNorm(g('mk'));o.marketing_consent=/^(نعم|yes|y|1|true|موافق)$/i.test(mk);o.consent_at=o.marketing_consent?new Date().toISOString():null;
     var bs=g('br');if(bs){o.branch_id=bmap[cuNorm(bs)];if(!o.branch_id)er.push('الفرع غير معروف')}else o.branch_id=defBr;
-    if(o.branch_id&&role!='system_admin'&&o.branch_id!=S.me.branch_id)er.push('فرع غير مسموح لك');
+    if(o.branch_id&&!can('all_branches')&&S.me.branch_id&&o.branch_id!=S.me.branch_id)er.push('فرع غير مسموح لك');
     if(!o.branch_id&&!er.length)er.push('الفرع غير محدد');
     er=er.concat(cuCheck(o));
     if(o.national_id&&(exN[o.national_id]||seenN[o.national_id]))er.push('الرقم القومي مكرر');
@@ -329,13 +376,14 @@ async function conLoad(id){
 function doPrint(html){var o=$('#pv');if(o)o.remove();o=document.createElement('div');o.id='pv';o.innerHTML=html;document.body.appendChild(o);document.body.classList.add('printing');
  var done=function(){document.body.classList.remove('printing');var p=$('#pv');if(p)p.remove();window.removeEventListener('afterprint',done)};window.addEventListener('afterprint',done);setTimeout(function(){window.print()},150)}
 async function vCon(){
- var r=await Promise.all([cuAll(function(){return sb.from('contracts').select('*,customers(full_name,phone,national_id),products(name)').order('created_at',{ascending:false})}),cuAll(function(){return sb.from('customers').select('id,full_name,phone,customer_code,branch_id,zone_id,housing,national_id,monthly_income,address,id_address').order('full_name')}),sb.from('investigations').select('national_id,guarantor1,guarantor2').eq('status','approved').limit(1000)]);
- var role=S.me.role,canNew=['system_admin','branch_manager','sales'].indexOf(role)>=0,adm2=['system_admin','branch_manager'].indexOf(role)>=0,v=$('#v'),cu=r[1],K=r[0],AI={},CF=S.ccf=S.ccf||{q:'',st:''};
+ var r=await Promise.all([cuAll(function(){return sb.from('contracts').select('*,customers(full_name,phone,national_id),products(name)').order('created_at',{ascending:false})}),cuAll(function(){return sb.from('customers').select('id,full_name,phone,customer_code,branch_id,zone_id,housing,national_id,monthly_income,address,id_address').order('full_name')}),sb.from('investigations').select('national_id,guarantor1,guarantor2').eq('status','approved').limit(1000),sb.from('v_delinquency').select('contract_id,days_late,overdue_amount').gt('days_late',0)]);
+ var role=S.me.role,canNew=can('con.create'),adm2=can('con.manual'),v=$('#v'),cu=r[1],K=r[0],AI={},CF=S.ccf=S.ccf||{q:'',st:''};
  (r[2].data||[]).forEach(function(a){AI[a.national_id]=a});
+ var DL={};(r[3].data||[]).forEach(function(x){DL[x.contract_id]=x});var canRef=can('coll.refer');
  var gF=function(p,t,g){g=g||{};return '<h3>'+t+'</h3><div class="f"><div><label for="'+p+'n">الاسم</label><input id="'+p+'n" value="'+esc(g.name)+'"></div><div><label for="'+p+'r">صلة القرابة</label><select id="'+p+'r">'+opts(REL.map(function(x){return{v:x}}),'v','v',g.relation,'اختر')+'</select></div><div><label for="'+p+'p">الهاتف</label><input id="'+p+'p" inputmode="numeric" maxlength="11" value="'+esc(g.phone)+'"></div><div><label for="'+p+'i">الرقم القومي</label><input id="'+p+'i" inputmode="numeric" maxlength="14" value="'+esc(g.national_id)+'"></div></div><label for="'+p+'a" style="margin-top:6px">العنوان الفعلي</label><textarea id="'+p+'a" rows="2">'+esc(g.address)+'</textarea><label for="'+p+'ia" style="margin-top:6px">عنوان البطاقة <span class="hint">(كما هو مكتوب في البطاقة، ويُطبع في إيصال الأمانة)</span></label><textarea id="'+p+'ia" rows="2">'+esc(g.id_address)+'</textarea>'};
  var form=canNew?'<div class="card"><h2>عقد جديد</h2><p class="hint">العقد لعميل استلم منتجًا (جديد أو نشط أو منتهي). العميل يُسجَّل في بند العملاء أو يُضاف من هنا. شروط العقد تُحسب تلقائيًا ويتفعّل فورًا بجدول أقساطه.</p>'+
   '<h3>العميل (المشتري)</h3><div class="f"><div><label for="kq">بحث عن العميل</label><input id="kq" placeholder="اسم أو هاتف أو كود"></div><div><label for="kc">العميل</label><select id="kc">'+opts(cu.slice(0,300),'id',function(x){return x.full_name+(x.customer_code?' ('+x.customer_code+')':'')},'','اختر')+'</select></div><div><label for="kcode">كود العقد (نفس كود العميل)</label><input id="kcode" maxlength="40"></div></div><div class="pay"><button class="btn" id="knb">عميل غير مسجل؟ أضفه هنا</button></div>'+
-  '<div id="knc" style="display:none" class="card"><div class="f"><div><label for="ncn">الاسم (4 كلمات على الأقل)</label><input id="ncn"></div><div><label for="ncp">الهاتف</label><input id="ncp" inputmode="numeric" maxlength="11"></div><div><label for="nci">الرقم القومي</label><input id="nci" inputmode="numeric" maxlength="14"></div><div><label for="ncm">الدخل الشهري</label><input id="ncm" type="number" min="0"></div>'+(role=='system_admin'?'<div><label for="ncb">الفرع</label><select id="ncb">'+opts(S.branches,'id','name','','اختر')+'</select></div>':'')+'</div><label for="nca" style="margin-top:6px">العنوان الفعلي</label><textarea id="nca" rows="2"></textarea></div>'+
+  '<div id="knc" style="display:none" class="card"><div class="f"><div><label for="ncn">الاسم (4 كلمات على الأقل)</label><input id="ncn"></div><div><label for="ncp">الهاتف</label><input id="ncp" inputmode="numeric" maxlength="11"></div><div><label for="nci">الرقم القومي</label><input id="nci" inputmode="numeric" maxlength="14"></div><div><label for="ncm">الدخل الشهري</label><input id="ncm" type="number" min="0"></div>'+(pickBr()?'<div><label for="ncb">الفرع</label><select id="ncb">'+opts(S.branches,'id','name','','اختر')+'</select></div>':'')+'</div><label for="nca" style="margin-top:6px">العنوان الفعلي</label><textarea id="nca" rows="2"></textarea></div>'+
   '<div id="kzbox" class="f" style="display:none;margin-top:8px"><div><label for="kzz">منطقة العميل (مطلوبة)</label><select id="kzz">'+opts(S.zones,'id',function(z){return z.name+' – '+z.governorate},'','اختر')+'</select></div><div><label for="khh">نوع السكن (مطلوب)</label><select id="khh"><option value="">اختر</option><option value="owned">تمليك</option><option value="old_rent">إيجار قديم</option></select></div></div>'+
   '<div class="two"><div><div class="pb" id="kbuy"><b>بيانات المشتري</b><br><span class="hint">اختر العميل لتظهر بياناته</span></div><label for="kbia" style="margin-top:6px">عنوان البطاقة للمشتري <span class="hint">(كما هو مكتوب في البطاقة، ويُطبع في إيصال الأمانة)</span></label><textarea id="kbia" rows="2"></textarea></div><div>'+gF('g1','بيانات الضامن الأول',{})+'<details style="margin-top:8px"><summary>إضافة ضامن ثانٍ (اختياري)</summary>'+gF('g2','بيانات الضامن الثاني',{})+'</details></div></div>'+
   '<h3>المنتج</h3><div class="f"><div><label for="kp">المنتج من القائمة</label><select id="kp">'+opts(S.products,'id',function(p){return p.name+' ('+p.annual_rate+'%)'},'','اختر')+'</select></div><div><label for="kpn">اسم المنتج (يدوي)</label><input id="kpn" placeholder="اكتب المنتج والموديل إن لم يكن في القائمة"></div><div><label for="kr">سعر المنتج</label><input id="kr" type="number" min="0"></div></div>'+
@@ -345,9 +393,10 @@ async function vCon(){
  v.innerHTML='<div id="cdet"></div>'+form+'<div class="card"><h2>العقود ('+L.length+')</h2><div class="f"><div><label for="fq2">بحث</label><input id="fq2" value="'+esc(CF.q)+'" placeholder="عميل أو كود أو منتج"></div><div><label for="fs2">الحالة</label><select id="fs2"><option value="">الكل</option>'+Object.keys(ST).map(function(k){return '<option value="'+k+'"'+(k==sf?' selected':'')+'>'+ST[k]+'</option>'}).join('')+'</select></div></div><div class="wrap"><table><tr><th>الكود</th><th>العميل</th><th>المنتج</th><th>الإجمالي</th><th>القسط</th><th>المدة</th><th>الحالة</th><th></th></tr>'+L.slice(0,200).map(function(c){
   var a='<button class="btn sm" data-f="'+c.id+'">ملف العقد</button> ';
   if(c.status=='draft'&&canNew)a+='<button class="btn sm am" data-act="'+c.id+'">تفعيل</button> ';
-  if(c.status=='draft'&&adm2)a+='<button class="btn sm" data-id="'+c.id+'" data-st="pending_credit">إرسال للائتمان</button>';
-  if(c.status=='pending_credit'&&(role=='credit_manager'||role=='system_admin'))a+='<button class="btn sm am" data-id="'+c.id+'" data-st="approved">اعتماد</button> <button class="btn sm rd" data-id="'+c.id+'" data-st="rejected">رفض</button>';
-  if(c.status=='approved'&&role=='system_admin')a+='<button class="btn sm am" data-id="'+c.id+'" data-st="active">اعتماد العقد النهائي</button>';
+  if(c.status=='draft'&&can('con.send_credit'))a+='<button class="btn sm" data-id="'+c.id+'" data-st="pending_credit">إرسال للائتمان</button>';
+  if(c.status=='pending_credit'&&can('con.credit'))a+='<button class="btn sm am" data-id="'+c.id+'" data-st="approved">اعتماد</button> <button class="btn sm rd" data-id="'+c.id+'" data-st="rejected">رفض</button>';
+  if(c.status=='active'&&canRef&&DL[c.id])a+='<button class="btn sm rd" data-lgr="'+c.id+'">تحويل للشؤون القانونية</button> ';
+  if(c.status=='approved'&&can('con.final'))a+='<button class="btn sm am" data-id="'+c.id+'" data-st="active">اعتماد العقد النهائي</button>';
   return '<tr><td>'+esc(c.code)+'</td><td>'+esc(c.customers&&c.customers.full_name)+'</td><td>'+esc(c.product_name||(c.products&&c.products.name))+'</td><td>'+n(c.total)+'</td><td>'+n(c.installment)+'</td><td>'+c.months+'</td><td><span class="tag">'+ST[c.status]+'</span></td><td>'+a+'</td></tr>'}).join('')+'</table></div>'+(L.length>200?'<p class="hint">يظهر أول 200 عقد، استخدم البحث.</p>':'')+'</div>';
  function cust(){var id=$('#kc').value;return cu.filter(function(x){return x.id==id})[0]}
  function setCust(c){
@@ -379,6 +428,11 @@ async function vCon(){
  v.onclick=async function(e){var t=e.target,a;
   if((a=t.getAttribute('data-f')))return conPopup(a,vCon);
   if(t.id=='knb'){var b=$('#knc');b.style.display=b.style.display=='none'?'':'none';return}
+  if((a=t.getAttribute('data-lgr'))){var k0=K.filter(function(x){return x.id==a})[0]||{},dl=DL[a]||{},asg=legalStaff(k0.branch_id);
+   $('#cdet').innerHTML='<div class="card"><h2>تحويل للشؤون القانونية</h2><p class="hint">العميل: <b>'+esc(k0.customers&&k0.customers.full_name)+'</b> · كود العقد: '+esc(k0.code||'—')+' · متأخر '+(dl.days_late||0)+' يومًا · المتأخرات: <b>'+n(dl.overdue_amount)+'</b> ج.م</p><div class="pay"><select id="lgw" aria-label="المحامي أو المندوب">'+opts(asg,'id',function(p){return p.full_name+' — '+RL[p.role]},'','اختر المسؤول عن القضية')+'</select><input id="lgrr" placeholder="سبب التحويل"><button class="btn rd" data-lgo="'+a+'">تأكيد التحويل</button><button class="btn" data-lgx="1">إلغاء</button></div></div>';$('#cdet').scrollIntoView({behavior:'smooth'});return}
+  if(t.getAttribute('data-lgx')){$('#cdet').innerHTML='';return}
+  if((a=t.getAttribute('data-lgo'))){var w=$('#lgw').value;if(!w)return msg('اختر المحامي أو مندوب التحصيل',1);if(!confirm('تحويل العميل للشؤون القانونية؟ سيخرج من قائمة المتأخرين.'))return;
+   t.disabled=true;var rr=await sb.rpc('legal_refer',{p_contract:a,p_assignee:w,p_reason:$('#lgrr').value.trim()||null});t.disabled=false;if(rr.error)return msg(em(rr.error),1);msg('تم التحويل للشؤون القانونية');return vCon()}
   if((a=t.getAttribute('data-act'))){if(await activate(a,false)){msg('تم تفعيل العقد');vCon()}return}
   var id=t.getAttribute('data-id'),st=t.getAttribute('data-st');
   if(id){var u2={status:st};if(st=='approved'||st=='rejected')u2.credit_note=prompt('ملاحظة القرار (اختياري)')||null;
@@ -388,7 +442,7 @@ async function vCon(){
    var c=cust(),newBox=$('#knc').style.display!='none',manual=adm2&&$('#kinst')&&$('#kinst').value!=='';
    var pn=$('#kpn').value.trim(),pid=$('#kp').value||null;if(!pid&&!pn)return msg('اختر المنتج أو اكتب اسمه يدويًا',1);
    if(newBox){var o={full_name:$('#ncn').value.trim().replace(/\s+/g,' '),phone:cuDig($('#ncp').value).trim()||null,national_id:cuDig($('#nci').value).trim()||null,address:$('#nca').value.trim()||null,id_address:$('#kbia').value.trim()||null,monthly_income:$('#ncm').value?+$('#ncm').value:null,zone_id:$('#kzz').value||null,housing:$('#khh').value||null},er=cuCheck(o);
-    if(er.length)return msg(er.join('، '),1);var bid=role=='system_admin'?$('#ncb').value:S.me.branch_id;if(!bid)return msg('حدد الفرع',1);o.branch_id=bid;
+    if(er.length)return msg(er.join('، '),1);var bid=pickBr()?$('#ncb').value:S.me.branch_id;if(!bid)return msg('حدد الفرع',1);o.branch_id=bid;
     if(!o.zone_id||!o.housing){$('#kzbox').style.display='';if(!manual)return msg('اختر منطقة العميل ونوع السكن',1)}
     var ic=await sb.from('customers').insert(o).select('id,full_name,phone,customer_code,branch_id,zone_id,housing,national_id,monthly_income,address,id_address').single();if(ic.error)return msg(/customers_nid_uq/.test(ic.error.message)?'الرقم القومي مسجل لعميل آخر':em(ic.error),1);c=ic.data;cu.push(c)}
    if(!c)return msg('اختر العميل أو أضف عميلًا جديدًا',1);
@@ -404,7 +458,8 @@ async function vCon(){
 
 /* ---------- التحصيل: تسجيل بتاريخ يدوي + عرض العقد ---------- */
 var ICO_CASH='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="vertical-align:-3px"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 10v4M18 10v4"/></svg>';
-function colOpts(){var st=S.profiles.filter(function(p){return p.active&&['collector','collection_rep','branch_manager','system_admin'].indexOf(p.role)>=0});
+function legalStaff(b){return S.profiles.filter(function(p){return p.active&&pcan(p,'legal.work')&&(!b||!p.branch_id||p.branch_id==b||pcan(p,'all_branches'))})}
+function colOpts(){var st=S.profiles.filter(function(p){return p.active&&pcan(p,'coll.pay')});
  return opts(st,'id',function(p){return p.full_name+' — '+RL[p.role]},S.me.id,'')+'<option value="__o">اسم آخر (اكتبه)</option>'}
 function payRow(k,amount){return '<div class="pay"><input type="number" min="1" id="pa_'+k+'" value="'+Math.round(amount||0)+'" aria-label="المبلغ"><input type="date" id="pd_'+k+'" value="'+today+'" max="'+today+'" aria-label="تاريخ التحصيل"><select id="pc_'+k+'" aria-label="المحصّل">'+colOpts()+'</select><input id="pn_'+k+'" placeholder="اسم المحصّل (عند اختيار اسم آخر)" style="display:none"><select id="pm_'+k+'" aria-label="الطريقة"><option value="field">تحصيل ميداني</option><option value="vodafone_cash">فودافون كاش</option></select><input id="pr_'+k+'" placeholder="مرجع العملية"></div>'}
 function payBind(root,k){var s=root.querySelector('#pc_'+k),i=root.querySelector('#pn_'+k);if(s)s.onchange=function(){i.style.display=s.value=='__o'?'':'none'}}
@@ -419,7 +474,7 @@ async function conPopup(id,after){
  var old=$('#cm');if(old)old.remove();
  var m=document.createElement('div');m.id='cm';m.className='md';m.innerHTML='<div class="card hint">جارٍ التحميل…</div>';document.body.appendChild(m);
  var d;try{d=await conLoad(id)}catch(e){m.remove();return msg(em(e),1)}
- var c=d.c,role=S.me.role,canPay=['system_admin','branch_manager','collector','collection_rep'].indexOf(role)>=0&&['active','legal'].indexOf(c.status)>=0,canNote=['system_admin','branch_manager'].indexOf(role)>=0,canRc=['system_admin','branch_manager','sales'].indexOf(role)>=0,canCx=['system_admin','branch_manager'].indexOf(role)>=0,g2=g2Of(d).name,nn=Math.ceil(c.months/3);
+ var c=d.c,role=S.me.role,canPay=can('coll.pay')&&['active','legal'].indexOf(c.status)>=0,canNote=can('con.notes'),canRc=can('con.receipts'),canCx=can('coll.cancel'),g2=g2Of(d).name,nn=Math.ceil(c.months/3);
  var due=d.ins.filter(function(x){return x.paid<x.amount&&x.due_date<=today}).reduce(function(s,x){return s+(x.amount-x.paid)},0);
  m.innerHTML='<div class="card"><div class="row"><h2>ملف العقد</h2><span class="pay" style="margin:0"><button class="btn am" data-prn="1">طباعة / حفظ PDF</button>'+(canRc?'<button class="btn" data-rcm="1">إيصالات الأمانة (اختياري)</button>':'')+'<button class="btn" data-clo="1">إغلاق</button></span></div><div id="rcbox"></div>'+(due>0?'<div class="alert bad">'+ICO_CASH+' المطلوب تحصيله الآن: <b>'+n(due)+'</b> ج.م</div>':'')+'<div class="cfile">'+conFile(d,canPay,canCx)+'</div>'+(canNote?'<label for="kn2" style="margin-top:8px">ملاحظات البيعة</label><textarea id="kn2" rows="3">'+esc(c.sale_notes)+'</textarea><div class="pay"><button class="btn" data-sn="1">حفظ الملاحظات</button></div>':'')+'</div>';
  m.onchange=function(e){var t=e.target;if(t.id&&t.id.indexOf('ic_')==0){var i=m.querySelector('#in_'+t.id.slice(3));if(i)i.style.display=t.value=='__o'?'':'none'}};
@@ -448,12 +503,12 @@ async function vColl(){
  if(r[0].error)throw r[0].error;
  var mp={};(r[1].data||[]).forEach(function(c){mp[c.id]=c});
  var rows=(r[0].data||[]).map(function(d){return Object.assign({},d,{c:mp[d.contract_id]||{}})}).sort(function(a,b){return b.days_late-a.days_late});
- var canPay=['system_admin','branch_manager','collector','collection_rep'].indexOf(S.me.role)>=0,canRef=['system_admin','branch_manager','collector'].indexOf(S.me.role)>=0,canCx=['system_admin','branch_manager'].indexOf(S.me.role)>=0,RP=r[2].data||[],asg=profs('lawyer').concat(profs('collection_rep')),v=$('#v');
+ var canPay=can('coll.pay'),canRef=can('coll.refer'),canCx=can('coll.cancel'),RP=r[2].data||[],asg=legalStaff(),v=$('#v');
  var tot=rows.filter(function(x){return x.days_late>0}).reduce(function(s,x){return s+ +x.overdue_amount},0);
  v.innerHTML='<div class="k"><div><b>'+rows.filter(function(x){return x.days_late>0}).length+'</b><span>عملاء متأخرون</span></div><div><b>'+n(tot)+'</b><span>إجمالي المطلوب تحصيله (ج.م)</span></div></div><div class="card"><div class="f"><div><label for="fs">الفئة</label><select id="fs"><option value="ov">كل المتأخرين</option><option value="all">الكل</option><option value="due">مستحق 1-30</option><option value="late">متأخر +30</option><option value="defaulted">متعثر +60</option><option value="bad">سيئ +90</option></select></div><div><label for="fq">بحث</label><input id="fq" placeholder="اسم أو هاتف"></div></div></div><div id="cl"></div><div class="card"><h2>آخر التحصيلات</h2>'+(RP.length?'<div class="wrap"><table><tr><th>التاريخ</th><th>العميل</th><th>كود العقد</th><th>المبلغ</th><th>المحصّل</th><th>الطريقة</th><th></th></tr>'+RP.map(function(p){var ct=p.contracts||{};return '<tr><td>'+fd(p.paid_at)+'</td><td>'+esc(ct.customers&&ct.customers.full_name)+'</td><td>'+esc(ct.code||'—')+'</td><td>'+n(p.amount)+'</td><td>'+esc(p.collector_name||un(p.collected_by))+'</td><td>'+(p.method=='vodafone_cash'?'فودافون كاش':'ميداني')+'</td><td><span class="pay" style="margin:0;flex-wrap:nowrap"><button class="btn sm" data-f="'+p.contract_id+'">العقد</button>'+(canCx?'<button class="btn sm rd" data-cxp="'+p.id+'" data-cxa="'+p.amount+'">إلغاء التحصيل</button>':'')+'</span></td></tr>'}).join('')+'</table></div>':'<p class="hint">لا توجد تحصيلات.</p>')+'</div>';
  function draw(){var f=$('#fs').value,q=$('#fq').value.trim(),l=rows.filter(function(x){var cu=x.c.customers||{};return (f=='all'||(f=='ov'?x.days_late>0:x.category==f))&&(!q||((cu.full_name||'')+' '+(cu.phone||'')).indexOf(q)>=0)});
   $('#cl').innerHTML=l.length?l.slice(0,100).map(function(x){var cu=x.c.customers||{},ct=CT[x.category],k=x.contract_id;
-   return '<div class="card" data-k="'+k+'"><div class="row"><b>'+esc(cu.full_name)+'</b><span class="tag '+ct[1]+'">'+ct[0]+(x.days_late>0?' · '+x.days_late+' يومًا':'')+'</span></div><div class="hint">'+esc(cu.phone)+' · '+esc(cu.zones&&cu.zones.name)+' · '+esc(bn(x.branch_id))+' · أقدم استحقاق: '+fd(x.oldest_due)+'</div><div class="alert '+(x.overdue_amount>0?'bad':'ok')+'">'+ICO_CASH+' المطلوب تحصيله: <b>'+n(x.overdue_amount)+'</b> ج.م · القسط الشهري: '+n(x.c.installment)+'</div>'+(canPay&&x.overdue_amount>0?payRow(k,x.overdue_amount)+'<div class="pay"><button class="btn am" data-c="'+k+'" data-b="'+x.branch_id+'">تسجيل تحصيل</button><button class="btn" data-f="'+k+'">عرض العقد</button></div>':'<div class="pay"><button class="btn" data-f="'+k+'">عرض العقد</button></div>')+(canRef&&x.days_late>0?'<div class="pay"><select id="lw'+k+'" aria-label="المحامي أو المندوب">'+opts(asg,'id',function(p){return p.full_name+' — '+RL[p.role]},'','اختر المحامي / المندوب')+'</select><input id="lr'+k+'" placeholder="سبب التحويل"><button class="btn rd" data-leg="'+k+'">تحويل للشؤون القانونية</button></div>':'')+'</div>'}).join('')+(l.length>100?'<p class="hint">يظهر أول 100، استخدم البحث.</p>':''):'<div class="card hint">لا توجد حالات مطابقة.</div>';
+   return '<div class="card" data-k="'+k+'"><div class="row"><b>'+esc(cu.full_name)+'</b><span class="tag '+ct[1]+'">'+ct[0]+(x.days_late>0?' · '+x.days_late+' يومًا':'')+'</span></div><div class="hint">'+esc(cu.phone)+' · '+esc(cu.zones&&cu.zones.name)+' · '+esc(bn(x.branch_id))+' · أقدم استحقاق: '+fd(x.oldest_due)+'</div><div class="alert '+(x.overdue_amount>0?'bad':'ok')+'">'+ICO_CASH+' المطلوب تحصيله: <b>'+n(x.overdue_amount)+'</b> ج.م · القسط الشهري: '+n(x.c.installment)+'</div>'+(canPay&&x.overdue_amount>0?payRow(k,x.overdue_amount)+'<div class="pay"><button class="btn am" data-c="'+k+'" data-b="'+x.branch_id+'">تسجيل تحصيل</button><button class="btn" data-f="'+k+'">عرض العقد</button></div>':'<div class="pay"><button class="btn" data-f="'+k+'">عرض العقد</button></div>')+(canRef&&x.days_late>0?'<div class="pay"><select id="lw'+k+'" aria-label="المحامي أو المندوب">'+opts(asg,'id',function(p){return p.full_name+' — '+RL[p.role]},'','اختر المسؤول عن القضية')+'</select><input id="lr'+k+'" placeholder="سبب التحويل"><button class="btn rd" data-leg="'+k+'">تحويل للشؤون القانونية</button></div>':'')+'</div>'}).join('')+(l.length>100?'<p class="hint">يظهر أول 100، استخدم البحث.</p>':''):'<div class="card hint">لا توجد حالات مطابقة.</div>';
   document.querySelectorAll('#cl .card[data-k]').forEach(function(cd){payBind(cd,cd.getAttribute('data-k'))})}
  draw();$('#fs').onchange=draw;$('#fq').oninput=draw;
  v.onclick=async function(e){var t=e.target,lg=t.getAttribute('data-leg'),f=t.getAttribute('data-f'),c=t.getAttribute('data-c');
@@ -467,11 +522,28 @@ async function vColl(){
 async function vAdm(){
  var r=await Promise.all([sb.from('profiles').select('*').order('full_name'),sb.from('branches').select('*').order('name'),sb.from('products').select('*').order('name')]);
  var v=$('#v');S.branches=r[1].data||[];S.products=r[2].data||[];
- v.innerHTML='<div class="card"><h2>المستخدمون</h2><p class="hint">أنشئ المستخدم من Supabase > Authentication > Users ثم فعّله هنا وحدد دوره وفرعه.</p><div class="wrap"><table><tr><th>الاسم</th><th>الدور</th><th>الفرع</th><th>مفعّل</th><th></th></tr>'+r[0].data.map(function(p){return '<tr><td><input id="un'+p.id+'" value="'+esc(p.full_name)+'"></td><td><select id="ur'+p.id+'">'+opts(Object.keys(RL).map(function(k){return{k:k,l:RL[k]}}),'k','l',p.role)+'</select></td><td><select id="ub'+p.id+'">'+opts(S.branches,'id','name',p.branch_id,'—')+'</select></td><td><input type="checkbox" id="ua'+p.id+'"'+(p.active?' checked':'')+'></td><td><button class="btn sm am" data-u="'+p.id+'">حفظ</button></td></tr>'}).join('')+'</table></div></div>'+
+ var U=r[0].data||[];S.profiles=U.map(function(x){return Object.assign({},x,{full_name:dname(x)})});var noName=U.filter(function(p){return !p.full_name||/@/.test(p.full_name)}).length;
+ v.innerHTML='<div class="card"><h2>المستخدمون والصلاحيات</h2><p class="hint">أنشئ المستخدم من Supabase > Authentication > Users ثم فعّله هنا. اكتب اسم الموظف ووظيفته، وهما اللي بيظهروا في البرنامج. البريد للدخول فقط. ومن «الصلاحيات» تحدد كل إجراء يقدر يعمله، وأي تغيير بيتطبق عنده فورًا.</p>'+(noName?'<div class="alert bad">فيه '+noName+' موظف من غير اسم. اكتب أسماءهم علشان تظهر بدل البريد.</div>':'')+'<div class="wrap"><table class="ulist"><tr><th>اسم الموظف</th><th>الوظيفة</th><th>الفرع</th><th>مفعّل</th><th></th></tr>'+U.map(function(p){var nm=p.full_name&&!/@/.test(p.full_name)?p.full_name:'';return '<tr><td><input id="un'+p.id+'" value="'+esc(nm)+'" placeholder="اكتب اسم الموظف"><div class="em">'+esc(p.email||'')+'</div></td><td><select id="ur'+p.id+'">'+opts(Object.keys(RL).map(function(k){return{k:k,l:RL[k]}}),'k','l',p.role)+'</select></td><td><select id="ub'+p.id+'">'+opts(S.branches,'id','name',p.branch_id,'—')+'</select></td><td><input type="checkbox" id="ua'+p.id+'"'+(p.active?' checked':'')+' aria-label="مفعّل"></td><td><span class="pay" style="margin:0;flex-wrap:nowrap"><button class="btn sm am" data-u="'+p.id+'">حفظ</button><button class="btn sm" data-pm="'+p.id+'">'+pico('lock')+' الصلاحيات'+(p.perms&&p.role!='system_admin'?' (مخصصة)':'')+'</button></span></td></tr>'}).join('')+'</table></div><div id="pmbox"></div></div>'+
  '<div class="card"><h2>الفروع</h2>'+S.branches.map(function(b){return '<div class="pay"><input id="bn'+b.id+'" value="'+esc(b.name)+'"><button class="btn sm" data-bn="'+b.id+'">حفظ الاسم</button></div>'}).join('')+'<div class="pay"><input id="nb" placeholder="فرع جديد"><button class="btn sm am" id="ab">إضافة فرع</button></div></div>'+
  '<div class="card"><h2>المنتجات والفائدة السنوية</h2><div class="wrap"><table><tr><th>المنتج</th><th>النوع</th><th>الفائدة %</th></tr>'+S.products.map(function(p){return '<tr><td>'+esc(p.name)+'</td><td>'+esc(p.category)+'</td><td>'+p.annual_rate+'</td></tr>'}).join('')+'</table></div><div class="pay"><input id="pn" placeholder="اسم المنتج"><select id="pc"><option value="appliance">أجهزة كهربائية</option><option value="mobile">موبايلات</option><option value="laptop">لاب توب</option></select><input id="pr" type="number" step="0.1" placeholder="الفائدة السنوية %"><button class="btn sm am" id="ap">إضافة منتج</button></div></div>';
- v.onclick=async function(e){var t=e.target,u=t.getAttribute('data-u'),b=t.getAttribute('data-bn'),x;
-  if(u)x=await sb.from('profiles').update({full_name:$('#un'+u).value.trim(),role:$('#ur'+u).value,branch_id:$('#ub'+u).value||null,active:$('#ua'+u).checked}).eq('id',u);
+ function pmDraw(id){var p=U.filter(function(x){return x.id==id})[0];if(!p)return;var adm=p.role=='system_admin',eff=effPerms(p),nm=p.full_name&&!/@/.test(p.full_name)?p.full_name:(p.email||'');
+  $('#pmbox').innerHTML='<div class="card" style="margin-top:10px"><div class="row"><h2>'+pico('lock')+' صلاحيات: '+esc(nm)+' — '+esc(RL[p.role])+'</h2><span class="pay" style="margin:0">'+(!adm&&p.perms?'<button class="btn sm" data-prs="'+id+'">رجوع لصلاحيات الوظيفة</button>':'')+'<button class="btn sm" data-pcl="1">إغلاق</button></span></div>'+
+   (adm?'<div class="alert">المدير العام عنده كل الصلاحيات دائمًا، ومش ممكن تتقفل.</div>':'<p class="hint">'+(p.perms?'<b>صلاحيات مخصصة</b> لهذا الموظف.':'الصلاحيات الحالية هي الافتراضية لوظيفة «'+esc(RL[p.role])+'».')+' اضغط على أي إجراء لفتحه أو قفله، والتغيير بيتحفظ ويتطبق عند الموظف فورًا.</p>')+
+   PG.map(function(g,gi){var on=g.p.filter(function(x){return eff.indexOf(x[0])>=0}).length;return '<div class="pgx"><div class="pgh"><b>'+pico(g.ic)+' '+g.t+' <span class="hint">('+on+'/'+g.p.length+')</span></b>'+(adm?'':'<span class="pay" style="margin:0"><button class="btn sm" data-pga="'+gi+'" data-pid="'+id+'">الكل</button><button class="btn sm" data-pgn="'+gi+'" data-pid="'+id+'">ولا حاجة</button></span>')+'</div><div class="pchips">'+g.p.map(function(x){var o=eff.indexOf(x[0])>=0;return '<button class="pchip'+(o?' on':'')+'" data-pk="'+x[0]+'" data-pid="'+id+'"'+(adm?' disabled':'')+' aria-pressed="'+o+'">'+pico(x[2])+esc(x[1])+'<i></i></button>'}).join('')+'</div></div>'}).join('')+'</div>';
+  $('#pmbox').scrollIntoView({behavior:'smooth',block:'start'})}
+ async function pmSave(id,np){var p=U.filter(function(x){return x.id==id})[0];var x=await sb.from('profiles').update({perms:np}).eq('id',id).select('id,perms').single();if(x.error){msg(em(x.error),1);return}
+  p.perms=x.data.perms;var sp=S.profiles.filter(function(z){return z.id==id})[0];if(sp)sp.perms=p.perms;pmDraw(id);var b=v.querySelector('[data-pm="'+id+'"]');if(b)b.innerHTML=pico('lock')+' الصلاحيات'+(p.perms?' (مخصصة)':'');msg('تم حفظ الصلاحيات، واتطبقت عند الموظف')}
+ v.onclick=async function(e){var t=e.target.closest('button')||e.target,u=t.getAttribute('data-u'),b=t.getAttribute('data-bn'),x,pid=t.getAttribute('data-pid');
+  if(t.getAttribute('data-pm'))return pmDraw(t.getAttribute('data-pm'));
+  if(t.getAttribute('data-pcl')){$('#pmbox').innerHTML='';return}
+  if(t.getAttribute('data-prs')){if(!confirm('رجوع لصلاحيات الوظيفة الافتراضية؟'))return;return pmSave(t.getAttribute('data-prs'),null)}
+  if(pid&&(t.getAttribute('data-pk')||t.getAttribute('data-pga')||t.getAttribute('data-pgn'))){var pp=U.filter(function(z){return z.id==pid})[0],cur=effPerms(pp).slice(),k=t.getAttribute('data-pk');
+   if(k){var ix=cur.indexOf(k);if(ix>=0)cur.splice(ix,1);else cur.push(k)}
+   else{var g=PG[+(t.getAttribute('data-pga')||t.getAttribute('data-pgn'))],add=!!t.getAttribute('data-pga');g.p.forEach(function(z){var j=cur.indexOf(z[0]);if(add&&j<0)cur.push(z[0]);if(!add&&j>=0)cur.splice(j,1)})}
+   t.disabled=true;await pmSave(pid,cur);return}
+  if(u){var nm=$('#un'+u).value.trim(),nr=$('#ur'+u).value;if(!nm)return msg('اكتب اسم الموظف',1);if(/@/.test(nm))return msg('اكتب اسم الموظف، مش البريد',1);
+   if(u==S.me.id&&(nr!='system_admin'||!$('#ua'+u).checked)&&!confirm('انت كده هتشيل صلاحية المدير العام من حسابك. متأكد؟'))return;
+   x=await sb.from('profiles').update({full_name:nm,role:nr,branch_id:$('#ub'+u).value||null,active:$('#ua'+u).checked}).eq('id',u)}
   else if(b)x=await sb.from('branches').update({name:$('#bn'+b).value.trim()}).eq('id',b);
   else if(t.id=='ab'){if(!$('#nb').value.trim())return;x=await sb.from('branches').insert({tenant_id:S.me.tenant_id,name:$('#nb').value.trim()})}
   else if(t.id=='ap'){if(!$('#pn').value.trim()||$('#pr').value==='')return msg('اكتب الاسم والفائدة',1);x=await sb.from('products').insert({tenant_id:S.me.tenant_id,name:$('#pn').value.trim(),category:$('#pc').value,annual_rate:+$('#pr').value})}
@@ -496,7 +568,7 @@ async function dashExtra(){
   var r=await Promise.all([sb.from('tasks').select('id,due_date').eq('status','open'),sb.from('investigations').select('id,due_date,status').in('status',['documents','visit','credit_review']),sb.from('leads').select('id,status')]);
   var tk=r[0].data||[],iv=r[1].data||[],ld=r[2].data||[];
   var tl=tk.filter(function(x){return x.due_date&&x.due_date<today}).length,il=iv.filter(function(x){return x.due_date&&x.due_date<today}).length;
-  var lg=['system_admin','branch_manager','collector'].indexOf(S.me.role)>=0?(await sb.from('legal_promises').select('promised_date').eq('status','pending').lte('promised_date',today)).data||[]:null;
+  var lg=can('legal.view')?(await sb.from('legal_promises').select('promised_date').eq('status','pending').lte('promised_date',today)).data||[]:null;
   var nl=ld.filter(function(x){return x.status=='new'||x.status=='follow_up'}).length;
   $('#v').insertAdjacentHTML('afterbegin','<div class="k"><div><b>'+tk.length+'</b><span>مهام مفتوحة ('+tl+' متأخرة)</span></div><div><b>'+iv.length+'</b><span>استعلامات جارية ('+il+' متأخرة)</span></div><div><b>'+nl+'</b><span>عملاء محتملون قيد المتابعة</span></div>'+(lg?'<div><b>'+lg.length+'</b><span>مواعيد اتفاق قانونية مستحقة/فائتة</span></div>':'')+'</div>')
  }catch(e){}
@@ -505,15 +577,15 @@ async function dashExtra(){
 /* ---------- المبيعات: العملاء المحتملون ---------- */
 var LS={new:'جديد',follow_up:'متابعة',qualified:'مؤهل',converted:'تم التحويل',lost:'خسارة'};
 async function vLeads(){
- var v=$('#v'),role=S.me.role,canNew=['system_admin','branch_manager','sales'].indexOf(role)>=0,mgr=['system_admin','branch_manager'].indexOf(role)>=0;
+ var v=$('#v'),role=S.me.role,canNew=can('leads.edit'),mgr=can('leads.assign');
  var L=chk(await sb.from('leads').select('*').order('created_at',{ascending:false}).limit(500));
  var cnt={new:0,follow_up:0,qualified:0,converted:0,lost:0};L.forEach(function(x){cnt[x.status]++});
  var conv=L.length?Math.round(cnt.converted/L.length*100):0;
- var form=canNew?'<div class="card"><h2>عميل محتمل جديد</h2><div class="f"><div><label for="ln">الاسم</label><input id="ln"></div><div><label for="lp">الهاتف</label><input id="lp" inputmode="tel"></div><div><label for="ls">المصدر</label><select id="ls"><option>اتصال مباشر</option><option>واتساب</option><option>فيسبوك</option><option>زيارة فرع</option><option>ترشيح عميل</option></select></div><div><label for="lf">موعد المتابعة</label><input id="lf" type="date"></div>'+(role=='system_admin'?'<div><label for="lb">الفرع</label><select id="lb">'+opts(S.branches,'id','name','','اختر')+'</select></div>':'')+'</div><div style="margin-top:8px"><label for="lt">ملاحظات</label><input id="lt"></div><button class="btn am" id="la" style="margin-top:10px">حفظ</button></div>':'';
+ var form=canNew?'<div class="card"><h2>عميل محتمل جديد</h2><div class="f"><div><label for="ln">الاسم</label><input id="ln"></div><div><label for="lp">الهاتف</label><input id="lp" inputmode="tel"></div><div><label for="ls">المصدر</label><select id="ls"><option>اتصال مباشر</option><option>واتساب</option><option>فيسبوك</option><option>زيارة فرع</option><option>ترشيح عميل</option></select></div><div><label for="lf">موعد المتابعة</label><input id="lf" type="date"></div>'+(pickBr()?'<div><label for="lb">الفرع</label><select id="lb">'+opts(S.branches,'id','name','','اختر')+'</select></div>':'')+'</div><div style="margin-top:8px"><label for="lt">ملاحظات</label><input id="lt"></div><button class="btn am" id="la" style="margin-top:10px">حفظ</button></div>':'';
  v.innerHTML='<div class="k"><div><b>'+L.length+'</b><span>إجمالي العملاء المحتملين</span></div><div><b>'+cnt.new+'</b><span>جدد</span></div><div><b>'+cnt.follow_up+'</b><span>قيد المتابعة</span></div><div><b>'+cnt.converted+'</b><span>تم تحويلهم</span></div><div><b>'+conv+'%</b><span>معدل التحويل</span></div></div>'+form+
  '<div class="card"><h2>المتابعة</h2><div class="wrap"><table><tr><th>الاسم</th><th>الهاتف</th><th>المصدر</th><th>الحالة</th><th>المتابعة القادمة</th><th>المسؤول</th><th>ملاحظات</th></tr>'+L.map(function(x){
   var late=x.next_followup&&x.next_followup<today&&(x.status=='new'||x.status=='follow_up');
-  var as=mgr?'<select data-la="'+x.id+'">'+opts(profs('sales',x.branch_id).concat(profs('branch_manager',x.branch_id)),'id','full_name',x.assigned_to,'—')+'</select>':esc(un(x.assigned_to));
+  var as=mgr?'<select data-la="'+x.id+'">'+opts(S.profiles.filter(function(p){return p.active&&pcan(p,'leads.edit')&&(p.branch_id==x.branch_id||pcan(p,'all_branches'))}),'id','full_name',x.assigned_to,'—')+'</select>':esc(un(x.assigned_to));
   return '<tr><td>'+esc(x.full_name)+'</td><td>'+esc(x.phone)+'</td><td>'+esc(x.source)+'</td><td>'+(canNew?'<select data-ls="'+x.id+'">'+Object.keys(LS).map(function(k){return '<option value="'+k+'"'+(k==x.status?' selected':'')+'>'+LS[k]+'</option>'}).join('')+'</select>':tg(LS[x.status]))+'</td><td><input type="date" data-lf="'+x.id+'" value="'+(x.next_followup||'')+'"'+(canNew?'':' disabled')+(late?' style="border-color:var(--rd)"':'')+'></td><td>'+as+'</td><td>'+esc(x.notes)+'</td></tr>'}).join('')+'</table></div></div>';
  v.onchange=function(e){var t=e.target,a;
   if((a=t.getAttribute('data-ls')))upd('leads',a,{status:t.value});
@@ -521,7 +593,7 @@ async function vLeads(){
   else if((a=t.getAttribute('data-la')))upd('leads',a,{assigned_to:t.value||null})};
  if(canNew)$('#la').onclick=async function(){
   var nm=$('#ln').value.trim();if(!nm)return msg('اكتب الاسم',1);
-  var bid=role=='system_admin'?$('#lb').value:S.me.branch_id;if(!bid)return msg('حدد الفرع',1);
+  var bid=pickBr()?$('#lb').value:S.me.branch_id;if(!bid)return msg('حدد الفرع',1);
   var x=await sb.from('leads').insert({branch_id:bid,full_name:nm,phone:$('#lp').value.trim()||null,source:$('#ls').value,next_followup:$('#lf').value||null,notes:$('#lt').value.trim()||null,assigned_to:S.me.id});
   if(x.error)return msg(em(x.error),1);msg('تم الحفظ');vLeads()}
 }
@@ -565,19 +637,19 @@ function appVals(a){var ob=[];($('#a_ob'+a).value||'').split('\n').forEach(funct
  var num=function(k){var x=$('#a_'+k+a).value;return x===''?null:+x},tx=function(k){return $('#a_'+k+a).value.trim()||null};
  return{customer_name:tx('nm'),customer_phone:tx('ph'),birth_date:tx('bd'),housing:tx('hs'),residence_years:num('ry'),customer_address:tx('ad'),address_details:tx('ads'),occupation_type:tx('oc'),employer_name:tx('en'),employer_address:tx('ea'),job_title:tx('jt'),net_income:num('ni'),income_freq:$('#a_fq'+a).value,income_since:tx('is'),new_installment:num('in'),obligations:ob,guarantor1:gV('g1'+a),guarantor2:gV('g2'+a)}}
 async function vInv(){
- var v=$('#v'),role=S.me.role,creator=['system_admin','branch_manager','sales'].indexOf(role)>=0,mgr=['system_admin','branch_manager'].indexOf(role)>=0;
+ var v=$('#v'),role=S.me.role,creator=can('inv.create'),mgr=can('inv.assign'),visitor=can('inv.visit'),allInv=can('inv.view');
  var L=chk(await sb.from('investigations').select('*').order('created_at',{ascending:false}).limit(300)),ids=L.map(function(i){return i.id});
  var DC=[],EV=[];
  if(ids.length){var r=await Promise.all([sb.from('investigation_docs').select('*').in('investigation_id',ids),sb.from('investigation_events').select('*').in('investigation_id',ids).order('at')]);DC=chk(r[0]);EV=chk(r[1])}
  var late=L.filter(function(i){return i.due_date&&i.due_date<today&&ACT.indexOf(i.status)>=0}).length;
  var st={};L.forEach(function(i){st[i.status]=(st[i.status]||0)+1});
  var open=S.invOpen||{},flt=S.invFlt||'';
- var form=creator?'<div class="card"><h2>طلب استعلام جديد</h2><div class="f"><div><label for="nn">اسم العميل</label><input id="nn"></div><div><label for="nnid">الرقم القومي (14 رقمًا)</label><input id="nnid" inputmode="numeric" maxlength="14"></div><div><label for="nph">الهاتف</label><input id="nph" inputmode="tel"></div><div><label for="nad">العنوان</label><input id="nad"></div>'+(role=='branch_manager'?'':'<div><label for="nb">الفرع</label><select id="nb">'+opts(S.branches,'id','name','','اختر')+'</select></div>')+'<div><label for="nt">النوع</label><select id="nt"><option value="credit">ائتماني</option><option value="housing">سكني</option><option value="job">وظيفي</option></select></div></div><button class="btn am" id="ia" style="margin-top:10px">تسجيل الطلب</button> <span class="hint">بعد التسجيل تُستكمل البيانات والمستندات داخل الطلب.</span>'+
+ var form=creator?'<div class="card"><h2>طلب استعلام جديد</h2><div class="f"><div><label for="nn">اسم العميل</label><input id="nn"></div><div><label for="nnid">الرقم القومي (14 رقمًا)</label><input id="nnid" inputmode="numeric" maxlength="14"></div><div><label for="nph">الهاتف</label><input id="nph" inputmode="tel"></div><div><label for="nad">العنوان</label><input id="nad"></div>'+(!pickBr()?'':'<div><label for="nb">الفرع</label><select id="nb">'+opts(S.branches,'id','name','','اختر')+'</select></div>')+'<div><label for="nt">النوع</label><select id="nt"><option value="credit">ائتماني</option><option value="housing">سكني</option><option value="job">وظيفي</option></select></div></div><button class="btn am" id="ia" style="margin-top:10px">تسجيل الطلب</button> <span class="hint">بعد التسجيل تُستكمل البيانات والمستندات داخل الطلب.</span>'+
   '<h2 style="margin-top:14px">البحث في تاريخ العميل</h2><div class="pay"><input id="hq" placeholder="الرقم القومي أو الهاتف أو الاسم (3 أحرف على الأقل)"><button class="btn" id="hb">بحث</button></div><div id="hr"></div></div>':'';
  function docs(i){var d=DC.filter(function(x){return x.investigation_id==i.id});
-  var can=creator&&i.status=='documents'||(role=='field_agent'&&i.assigned_agent==S.me.id||role=='system_admin')&&i.status=='visit';
-  var h='<div class="hint" style="margin-top:8px">المستندات: '+(d.length?d.map(function(x){return '<a href="#" data-open="'+esc(x.file_path)+'">'+esc(DT[x.doc_type])+'</a>'+(can&&x.uploaded_by==S.me.id?' <a href="#" data-rmd="'+x.id+'" data-rmp="'+esc(x.file_path)+'" style="color:var(--rd)">×</a>':'')}).join(' · '):'لا يوجد')+'</div>';
-  if(can){var ty=role=='field_agent'?['visit_photo','other']:Object.keys(DT).filter(function(k){return k!='visit_photo'});
+  var canD=creator&&(allInv||i.created_by==S.me.id)&&i.status=='documents'||visitor&&(i.assigned_agent==S.me.id||mgr||role=='system_admin')&&i.status=='visit';
+  var h='<div class="hint" style="margin-top:8px">المستندات: '+(d.length?d.map(function(x){return '<a href="#" data-open="'+esc(x.file_path)+'">'+esc(DT[x.doc_type])+'</a>'+(canD&&x.uploaded_by==S.me.id?' <a href="#" data-rmd="'+x.id+'" data-rmp="'+esc(x.file_path)+'" style="color:var(--rd)">×</a>':'')}).join(' · '):'لا يوجد')+'</div>';
+  if(canD){var ty=i.status=='visit'?['visit_photo','other']:Object.keys(DT).filter(function(k){return k!='visit_photo'});
    h+='<div class="pay"><select id="dt'+i.id+'" aria-label="نوع المستند">'+ty.map(function(k){return '<option value="'+k+'">'+DT[k]+'</option>'}).join('')+'</select><input type="file" id="df'+i.id+'" accept="image/*,application/pdf" aria-label="الملف"><button class="btn" data-up="'+i.id+'">رفع</button></div>'}
   return h}
  function card(i){
@@ -587,25 +659,25 @@ async function vInv(){
   if(i.returned_reason&&act)h+='<div class="alert bad">أُعيد من الائتمان: '+esc(i.returned_reason)+'</div>';
   if(i.status=='cancelled')h+='<div class="alert bad">ملغى: '+esc(i.cancel_reason)+'</div>';
   if(i.monthly_income!=null)h+='<div class="k" style="margin-top:8px"><div><b>'+n(i.monthly_income)+'</b><span>الدخل الشهري</span></div><div><b>'+n(i.obligations_monthly)+'</b><span>التزامات خارجية</span></div><div><b>'+n(i.new_installment)+'</b><span>القسط الجديد</span></div><div><b>'+(i.dti==null?'—':i.dti+'%')+'</b><span>نسبة الالتزام من الدخل</span></div></div>';
-  if(i.status=='documents'&&creator&&(role!='sales'||i.created_by==S.me.id)){
+  if(i.status=='documents'&&creator&&(allInv||i.created_by==S.me.id)){
    h+=appForm(i)+docs(i)+'<div class="pay"><button class="btn" data-sva="'+i.id+'">حفظ البيانات</button><button class="btn am" data-tov="'+i.id+'">اعتماد وإرسال للزيارة الميدانية</button></div>';
   }else if(i.status=='documents'){h+='<div class="hint">بانتظار استكمال البيانات والمستندات.</div>'+docs(i)}
   else h+=docs(i);
   if(i.status=='visit'){
-   if(mgr)h+='<div class="pay"><select id="ag'+i.id+'" aria-label="المسؤول">'+opts(profs('field_agent').concat(profs('system_admin')),'id','full_name',i.assigned_agent,'اختر مسؤول الاستعلام')+'</select><input type="date" id="dd'+i.id+'" value="'+(i.due_date||addDays(3))+'" aria-label="الموعد"><button class="btn am" data-asg="'+i.id+'">إسناد</button></div>';
+   if(mgr)h+='<div class="pay"><select id="ag'+i.id+'" aria-label="المسؤول">'+opts(S.profiles.filter(function(p){return p.active&&pcan(p,'inv.visit')}),'id','full_name',i.assigned_agent,'اختر مسؤول الاستعلام')+'</select><input type="date" id="dd'+i.id+'" value="'+(i.due_date||addDays(3))+'" aria-label="الموعد"><button class="btn am" data-asg="'+i.id+'">إسناد</button></div>';
    h+='<div class="hint">المسؤول: '+(i.assigned_agent?esc(un(i.assigned_agent)):'غير مُسند')+' · الموعد: '+fd(i.due_date)+(i.visit_at?' · الزيارة: '+fd(i.visit_at):'')+(i.visit_lat?' · <a href="https://www.openstreetmap.org/?mlat='+i.visit_lat+'&mlon='+i.visit_lng+'#map=17/'+i.visit_lat+'/'+i.visit_lng+'" target="_blank" rel="noopener">الموقع على الخريطة</a>':'')+'</div>';
-   if((role=='field_agent'||role=='system_admin')&&!i.assigned_agent)h+='<div class="pay"><button class="btn am" data-claim="'+i.id+'">استلام هذه الزيارة</button></div>';
-   if((role=='field_agent'&&i.assigned_agent==S.me.id)||role=='system_admin'){
+   if(visitor&&!i.assigned_agent)h+='<div class="pay"><button class="btn am" data-claim="'+i.id+'">استلام هذه الزيارة</button></div>';
+   if(visitor&&(i.assigned_agent==S.me.id||mgr||role=='system_admin')){
     h+='<div class="f" style="margin-top:8px"><div><label for="vv'+i.id+'">هل السكن مطابق؟</label><select id="vv'+i.id+'"><option value="">اختر</option><option value="1"'+(i.visit_verified===true?' selected':'')+'>مطابق</option><option value="0"'+(i.visit_verified===false?' selected':'')+'>غير مطابق</option></select></div><div><label for="vj'+i.id+'">هل جهة العمل مطابقة؟</label><select id="vj'+i.id+'"><option value="">لم تُفحص</option><option value="1"'+(i.visit_job_verified===true?' selected':'')+'>مطابقة</option><option value="0"'+(i.visit_job_verified===false?' selected':'')+'>غير مطابقة</option></select></div></div><label for="fn'+i.id+'" style="margin-top:6px">تقرير الزيارة</label><textarea id="fn'+i.id+'" rows="3">'+esc(i.field_notes)+'</textarea><label for="mi'+i.id+'" style="margin-top:6px">نواقص (اختياري)</label><input id="mi'+i.id+'" value="'+esc(i.missing_items)+'"><div class="pay"><button class="btn" data-loc="'+i.id+'">تسجيل موقع الزيارة الآن</button><button class="btn" data-sv="'+i.id+'">حفظ</button><button class="btn am" data-fin="'+i.id+'">إنهاء الزيارة وإرسال للائتمان</button></div>'}
   }else if(i.field_notes||i.visit_at){
    h+='<div class="hint">تقرير الزيارة: '+esc(i.field_notes)+' · السكن: '+(i.visit_verified===true?'مطابق':i.visit_verified===false?'غير مطابق':'—')+' · العمل: '+(i.visit_job_verified===true?'مطابق':i.visit_job_verified===false?'غير مطابق':'—')+(i.missing_items?' · نواقص: '+esc(i.missing_items):'')+'</div>'}
-  if(i.status=='credit_review'&&(role=='credit_manager'||role=='system_admin')){
+  if(i.status=='credit_review'&&can('inv.credit')){
    h+='<div class="f" style="margin-top:8px"><div><label for="cr'+i.id+'">التوصية</label><select id="cr'+i.id+'"><option value="">اختر</option>'+Object.keys(CR).map(function(k){return '<option value="'+k+'"'+(i.credit_recommendation==k?' selected':'')+'>'+CR[k]+'</option>'}).join('')+'</select></div></div><label for="cs'+i.id+'" style="margin-top:6px">الأسباب (إلزامية عند الرفض)</label><textarea id="cs'+i.id+'" rows="2">'+esc(i.credit_reasons)+'</textarea><label for="cn'+i.id+'" style="margin-top:6px">ملاحظة</label><input id="cn'+i.id+'" value="'+esc(i.credit_note)+'"><div class="pay"><button class="btn am" data-dec="'+i.id+'" data-d="approved">موافقة</button><button class="btn rd" data-dec="'+i.id+'" data-d="rejected">رفض</button></div><label for="rr'+i.id+'" style="margin-top:6px">أو إرجاع الطلب (اكتب السبب)</label><div class="pay"><input id="rr'+i.id+'"><button class="btn" data-ret="'+i.id+'" data-to="visit">إرجاع للزيارة</button><button class="btn" data-ret="'+i.id+'" data-to="documents">إرجاع للمستندات</button></div>'}
   else if(i.credit_recommendation)h+='<div class="hint">التوصية: '+CR[i.credit_recommendation]+(i.credit_reasons?' · '+esc(i.credit_reasons):'')+(i.credit_note?' · '+esc(i.credit_note):'')+'</div>';
   if(i.credit_decision)h+='<div class="alert ok">القرار: '+CD[i.credit_decision]+' · '+esc(un(i.decided_by))+' · '+fd(i.decided_at)+'</div>';
   if(i.status=='approved'&&creator)h+='<div class="pay"><button class="btn am" data-mkc="'+i.id+'">فتح عقد لهذا العميل</button></div><p class="hint">يظهر العميل مرشحًا في نموذج العقد ببياناته.</p>';
   if(i.ai_summary)h+='<div class="hint">تحليل الذكاء الاصطناعي: '+esc(i.ai_summary)+'</div>';
-  if(act&&creator&&(role!='sales'||i.created_by==S.me.id))h+='<div class="pay"><input id="cxr'+i.id+'" placeholder="سبب الإلغاء"><button class="btn rd" data-cx="'+i.id+'">إلغاء الطلب</button></div>';
+  if(act&&can('inv.cancel')&&(allInv||i.created_by==S.me.id))h+='<div class="pay"><input id="cxr'+i.id+'" placeholder="سبب الإلغاء"><button class="btn rd" data-cx="'+i.id+'">إلغاء الطلب</button></div>';
   var ev=EV.filter(function(x){return x.investigation_id==i.id});
   h+='<div class="hint" style="margin-top:8px"><b>سجل الطلب</b><br>'+ev.map(function(x){return fd(x.at)+' '+String(x.at).slice(11,16)+' — '+(x.from_status==x.to_status?'':(x.from_status?IS[x.from_status]+' ← ':'')+IS[x.to_status])+' '+esc(un(x.by_user))+(x.note?' · '+esc(x.note):'')}).join('<br>')+'</div>';
   return h+'</details>'}
@@ -638,7 +710,7 @@ async function vInv(){
   if((a=t.getAttribute('data-ret'))){var rr=$('#rr'+a).value.trim();if(!rr)return msg('اكتب سبب الإرجاع',1);return go2(a,{status:t.getAttribute('data-to'),returned_reason:rr})}
   if(t.id=='hb'){var q=$('#hq').value.trim(),x=await sb.rpc('inv_history',{q:q});if(x.error)return msg(em(x.error),1);
    $('#hr').innerHTML=x.data.length?'<div class="wrap"><table><tr><th>الاسم</th><th>الرقم القومي</th><th>الحالة</th><th>الفرع</th><th>التاريخ</th><th>بواسطة</th></tr>'+x.data.map(function(r){return '<tr><td>'+esc(r.customer_name)+'</td><td>'+esc(r.national_id_masked)+'</td><td>'+esc(IS[r.status])+'</td><td>'+esc(r.branch_name)+'</td><td>'+fd(r.created_at)+'</td><td>'+esc(r.created_by_name)+'</td></tr>'}).join('')+'</table></div>':'<p class="hint">لا توجد نتائج سابقة.</p>';return}
-  if(t.id=='ia'){var nid=$('#nid')?0:0,nm=$('#nn').value.trim(),ni=$('#nnid').value.trim(),bid=role=='branch_manager'?S.me.branch_id:$('#nb').value;
+  if(t.id=='ia'){var nid=$('#nid')?0:0,nm=$('#nn').value.trim(),ni=$('#nnid').value.trim(),bid=!pickBr()?S.me.branch_id:$('#nb').value;
    if(!nm)return msg('اكتب اسم العميل',1);if(!/^\d{14}$/.test(ni))return msg('الرقم القومي يجب أن يكون 14 رقمًا',1);if(!bid)return msg('حدد الفرع',1);
    var ix=await sb.from('investigations').insert({branch_id:bid,customer_name:nm,national_id:ni,customer_phone:$('#nph').value.trim()||null,customer_address:$('#nad').value.trim()||null,inv_type:$('#nt').value});
    if(ix.error)return msg(em(ix.error),1);msg('تم تسجيل الطلب في مرحلة المستندات');vInv()}}
@@ -649,7 +721,7 @@ var LGS={open:'جديدة',negotiating:'تفاوض',in_court:'قضية',settled:
 var LACT=['open','negotiating','in_court'];
 var PS2={pending:'قيد الانتظار',kept:'تم الالتزام',broken:'لم يلتزم'};
 async function vLegal(){
- var v=$('#v'),role=S.me.role,mgr=['system_admin','branch_manager'].indexOf(role)>=0,canWork=['system_admin','branch_manager','collector','lawyer','collection_rep'].indexOf(role)>=0,canEnd=['system_admin','branch_manager','lawyer','collection_rep'].indexOf(role)>=0;
+ var v=$('#v'),role=S.me.role,mgr=can('legal.reassign'),canWork=can('legal.work'),canEnd=can('legal.status');
  var L=chk(await sb.from('legal_cases').select('*,customers(full_name,phone,national_id,address,housing),contracts(price,down_payment,months,installment,total,start_date,annual_rate,method,status)').order('referred_at',{ascending:false}).limit(300)),ids=L.map(function(c){return c.id}),cids=L.map(function(c){return c.contract_id}),nids=L.map(function(c){return c.customers&&c.customers.national_id}).filter(Boolean);
  var PR=[],EV=[],IN=[],PY=[],DC=[],ID=[];
  if(ids.length){
@@ -659,7 +731,7 @@ async function vLegal(){
   if(ID.length)DC=chk(await sb.from('investigation_docs').select('investigation_id,doc_type,file_path').in('investigation_id',ID.map(function(x){return x.id})))}
  var act=L.filter(function(c){return LACT.indexOf(c.status)>=0}),pend=PR.filter(function(p){return p.status=='pending'&&LACT.indexOf((L.filter(function(c){return c.id==p.case_id})[0]||{}).status)>=0});
  var pt=pend.filter(function(p){return p.promised_date==today}).length,po=pend.filter(function(p){return p.promised_date<today}).length;
- var open=S.lgOpen||{},flt=S.lgFlt||'act',assignees=profs('lawyer').concat(profs('collection_rep'));
+ var open=S.lgOpen||{},flt=S.lgFlt||'act',assignees=legalStaff();
  function card(c){
   var cu=c.customers||{},ct=c.contracts||{},isAct=LACT.indexOf(c.status)>=0,pr=PR.filter(function(p){return p.case_id==c.id}),ev=EV.filter(function(e){return e.case_id==c.id}),ins=IN.filter(function(x){return x.contract_id==c.contract_id}),py=PY.filter(function(x){return x.contract_id==c.contract_id});
   var nx=pr.filter(function(p){return p.status=='pending'})[0],paid=ins.reduce(function(s,x){return s+ +x.paid},0),rem=ins.reduce(function(s,x){return s+(x.amount-x.paid)},0),late=nx&&nx.promised_date<today;
@@ -697,7 +769,7 @@ async function vLegal(){
 /* ---------- المهام ---------- */
 async function vTasks(){
  var v=$('#v'),role=S.me.role,T=chk(await sb.from('tasks').select('*').order('status',{ascending:false}).order('due_date',{ascending:true,nullsFirst:false}).limit(500));
- var ass=role=='system_admin'?profs():role=='branch_manager'?profs(null,S.me.branch_id):[S.me];
+ var ass=can('task.assign')?(can('all_branches')||!S.me.branch_id?profs():profs(null,S.me.branch_id)):[S.me];
  var open=T.filter(function(x){return x.status=='open'}),late=open.filter(function(x){return x.due_date&&x.due_date<today}).length;
  v.innerHTML='<div class="k"><div><b>'+open.length+'</b><span>مفتوحة</span></div><div><b>'+late+'</b><span>متأخرة</span></div><div><b>'+(T.length-open.length)+'</b><span>منتهية</span></div></div><div class="card"><h2>مهمة جديدة</h2><div class="f"><div><label for="tt">العنوان</label><input id="tt"></div><div><label for="ta">المسؤول</label><select id="ta">'+opts(ass,'id','full_name',S.me.id)+'</select></div><div><label for="td">الموعد النهائي</label><input id="td" type="date" value="'+addDays(3)+'"></div></div><div style="margin-top:8px"><label for="tx">تفاصيل</label><input id="tx"></div><button class="btn am" id="tn" style="margin-top:10px">إضافة</button></div><div class="card"><h2>المهام</h2><div class="wrap"><table><tr><th>المهمة</th><th>المسؤول</th><th>الموعد</th><th>المصدر</th><th></th></tr>'+T.map(function(x){
   var lt=x.status=='open'&&x.due_date&&x.due_date<today;
@@ -712,7 +784,7 @@ async function vTasks(){
 
 /* ---------- المستهدفات ---------- */
 async function vTgt(){
- var v=$('#v'),role=S.me.role,m=window._tm||curMonth(),admin=role=='system_admin';
+ var v=$('#v'),role=S.me.role,m=window._tm||curMonth(),admin=can('tgt.edit');
  var P=chk(await sb.from('v_target_progress').select('*').eq('period_start',m+'-01'));
  var now=new Date(),isCur=m==curMonth(),dim=new Date(+m.slice(0,4),+m.slice(5,7),0).getDate(),el=isCur?now.getDate():(m<curMonth()?dim:0),exp=Math.round(el/dim*100),left=isCur?Math.max(1,dim-el+1):1;
  var so={company:0,branch:1,user:2};P.sort(function(a,b){return so[a.scope]-so[b.scope]});
