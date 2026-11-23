@@ -121,9 +121,21 @@ Deno.serve(async (req) => {
     const msgs: any[] = [{ role: 'system', content: sysPrompt(me, perms, br?.name || '', mode) }, ...hist];
     let pt = 0, ct = 0, reply = '';
     // لو الموديل عليه ضغط أو مش متاح، جرّب موديلات تانية تلقائيًا (مهم في نسخة جوجل المجانية)
-    const models = provider === 'openai' ? [cfg.model] : [...new Set([cfg.model, 'gemini-3-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'])];
+    let models: string[] = [cfg.model];
+    if (provider === 'gemini') {
+      // اسأل جوجل عن الموديلات المتاحة دلوقتي ورتّب موديلات flash من الأحدث للأقدم
+      try {
+        const lr = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/models', { headers: { Authorization: `Bearer ${key}` } });
+        const lj = await lr.json();
+        const ids: string[] = (lj?.data || []).map((x: any) => String(x.id || '').replace(/^models\//, ''))
+          .filter((x: string) => /flash/i.test(x) && !/image|tts|audio|live|embed|vision|thinking|exp|preview/i.test(x));
+        const ver = (x: string) => parseFloat((x.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || '0');
+        ids.sort((a, b) => ver(b) - ver(a) || (/lite/.test(a) ? 1 : 0) - (/lite/.test(b) ? 1 : 0));
+        models = [...new Set([cfg.model, ...ids.slice(0, 6)])];
+      } catch (_) { /* لو القايمة مجتش نكمل بالموديل المختار */ }
+    }
     let mi = 0;
-    const busy = (st: number, m: string) => st === 429 || st === 500 || st === 503 || st === 404 || /demand|overload|unavailable|not found|not supported|exhausted|quota/i.test(m);
+    const busy = (st: number, m: string) => st === 429 || st === 500 || st === 503 || st === 404 || /demand|overload|unavailable|not found|not supported|no longer|exhausted|quota/i.test(m);
     for (let i = 0; i < 8; i++) {
       const lim = mode === 'report' ? 8000 : 2500;
       let r: Response, j: any;
@@ -134,6 +146,9 @@ Deno.serve(async (req) => {
         const j0 = await r.json().catch(() => ({})); j = Array.isArray(j0) ? j0[0] : j0;
         if (r.ok) break;
         const em = String(j?.error?.message || r.status);
+        const sug = em.match(/use (?:models\/)?(gemini-[\w.-]+)/i);
+        const sm = sug ? sug[1].replace(/\.+$/, '') : '';
+        if (provider === 'gemini' && sm && !models.includes(sm)) models.splice(mi + 1, 0, sm);
         if (provider === 'gemini' && busy(r.status, em) && tries < models.length + 1) {
           if (tries === 0 && r.status !== 404) { await new Promise((z) => setTimeout(z, 1500)); continue; }
           if (mi < models.length - 1) { mi++; continue; }
