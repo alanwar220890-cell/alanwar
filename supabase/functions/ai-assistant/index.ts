@@ -120,13 +120,27 @@ Deno.serve(async (req) => {
     if (mode === 'report') hist.push({ role: 'user', content: 'اعمل التقرير التحليلي الأسبوعي دلوقتي. استخدم branch_performance و team_performance للشهر ده والشهر اللي فات و kpi_trend و ops_plans.' });
     const msgs: any[] = [{ role: 'system', content: sysPrompt(me, perms, br?.name || '', mode) }, ...hist];
     let pt = 0, ct = 0, reply = '';
+    // لو الموديل عليه ضغط أو مش متاح، جرّب موديلات تانية تلقائيًا (مهم في نسخة جوجل المجانية)
+    const models = provider === 'openai' ? [cfg.model] : [...new Set([cfg.model, 'gemini-3-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'])];
+    let mi = 0;
+    const busy = (st: number, m: string) => st === 429 || st === 500 || st === 503 || st === 404 || /demand|overload|unavailable|not found|not supported|exhausted|quota/i.test(m);
     for (let i = 0; i < 8; i++) {
       const lim = mode === 'report' ? 8000 : 2500;
-      const payload: any = { model: cfg.model, messages: msgs, tools };
-      if (provider === 'openai') payload.max_completion_tokens = lim; else { payload.max_tokens = lim; payload.reasoning_effort = 'low'; }
-      const r = await fetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      const j0 = await r.json(); const j = Array.isArray(j0) ? j0[0] : j0;
-      if (!r.ok) return out(200, { error: (provider === 'openai' ? 'OpenAI: ' : 'Gemini: ') + (j?.error?.message || r.status) });
+      let r: Response, j: any;
+      for (let tries = 0; ; tries++) {
+        const payload: any = { model: models[mi], messages: msgs, tools };
+        if (provider === 'openai') payload.max_completion_tokens = lim; else { payload.max_tokens = lim; payload.reasoning_effort = 'low'; }
+        r = await fetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const j0 = await r.json().catch(() => ({})); j = Array.isArray(j0) ? j0[0] : j0;
+        if (r.ok) break;
+        const em = String(j?.error?.message || r.status);
+        if (provider === 'gemini' && busy(r.status, em) && tries < models.length + 1) {
+          if (tries === 0 && r.status !== 404) { await new Promise((z) => setTimeout(z, 1500)); continue; }
+          if (mi < models.length - 1) { mi++; continue; }
+        }
+        return out(200, { error: (provider === 'openai' ? 'OpenAI: ' : 'Gemini: ') + (r.status === 503 || /demand/i.test(em) ? 'كل موديلات جوجل المجانية عليها ضغط دلوقتي، جرب كمان دقيقة. ' : '') + em });
+      }
+      cfg.model = models[mi];
       pt += j.usage?.prompt_tokens || 0; ct += j.usage?.completion_tokens || 0;
       const msg = j.choices?.[0]?.message; if (!msg) break;
       msgs.push(msg);
