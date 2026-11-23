@@ -1,0 +1,26 @@
+name: محرك التحسين (OR-Tools)
+on:
+  schedule:
+    - cron: '35 21 * * *'   # 11:35 بالليل بتوقيت القاهرة — خطط يوم بكرة
+  workflow_dispatch:
+    inputs:
+      demo:
+        description: 'تجربة ببيانات وهمية من غير ما يحفظ'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  optimize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet ortools==9.11.4210
+      - name: تشغيل التحسين
+        env:
+          OPS_TOKEN: ${{ secrets.OPS_TOKEN }}
+        run: python ops/optimize.py ${{ inputs.demo && '--demo' || '' }}
