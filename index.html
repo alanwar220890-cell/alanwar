@@ -325,7 +325,7 @@ async function vCust(){
  function draw(){var L=filt(),ps=+(F.ps||10),pc=Math.max(1,Math.ceil(L.length/ps));F.pg=Math.min(Math.max(1,F.pg||1),pc);var vis=L.slice((F.pg-1)*ps,F.pg*ps);$('#cn0').textContent=L.length+' عميل مطابق';
   var stg=$('#mks')?$('#mks').value:'m1',mke=$('#mke')?$('#mke').value:'';CURM=vis.map(function(r){return mkObj(r,stg,mke)});
   if($('#mkst')){var st0=vis.filter(function(r){return r.consent}).length,sn=vis.filter(function(r){return MK_SENT[stg+'|'+mkKey(r)]}).length;$('#mkst').textContent='الصفحة دي: '+vis.length+' عميل، منهم '+st0+' موافق على التسويق، واتبعتلهم المرحلة دي الشهر ده: '+sn+'. الرسايل التسويقية بتتبعت للموافقين بس.'}
-  $('#ct').innerHTML='<tr><th>الكود</th><th>الاسم</th><th>الهاتف</th><th>الرقم القومي</th><th>المنطقة</th><th>الفرع</th><th>الحالة</th><th>آخر تعامل</th><th>التقييم</th><th>الدخل</th><th></th></tr>'+vis.map(function(r){var mo=mAgo(r.last);return '<tr><td>'+esc(r.code)+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.phone)+'</td><td>'+esc(r.nid)+'</td><td>'+esc(r.zone)+'</td><td>'+esc(r.branch)+'</td><td>'+tg(r.label,r.f.legal||r.f.late?'t2':r.f.active?'t0':r.f.inquiry?'t1':'')+'</td><td>'+(r.dealing?'<span class="hint">بيتعامل حاليًا</span>':r.last?fd(r.last)+' <span class="hint">('+(mo<1?'أقل من شهر':mo+' شهر')+')</span>':'—')+'</td><td>'+(r.rate?'<span title="ترحيلات: '+r.defs+' من '+r.allow+' مسموح">'+tg(RT[r.rate][0],RT[r.rate][1])+'</span>':'—')+'</td><td>'+(r.income==null?'—':n(r.income))+'</td><td><span class="pay" style="margin:0;flex-wrap:nowrap">'+(canNew&&r.kind=='c'?'<button class="btn sm" data-ed="'+r.c.id+'">تعديل</button>':'')+(can('cust.market')?mkBtn(mkObj(r,stg,mke)):'')+'</span></td></tr>'}).join('');
+  $('#ct').innerHTML='<tr><th>الكود</th><th>الاسم</th><th>الهاتف</th><th>الرقم القومي</th><th>المنطقة</th><th>الفرع</th><th>الحالة</th><th>آخر تعامل</th><th>التقييم</th><th>الدخل</th><th></th></tr>'+vis.map(function(r){var mo=mAgo(r.last);return '<tr><td>'+esc(r.code)+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.phone)+'</td><td>'+esc(r.nid)+'</td><td>'+esc(r.zone)+'</td><td>'+esc(r.branch)+'</td><td>'+tg(r.label,r.f.legal||r.f.late?'t2':r.f.active?'t0':r.f.inquiry?'t1':'')+'</td><td>'+(r.dealing?'<span class="hint">بيتعامل حاليًا</span>':r.last?fd(r.last)+' <span class="hint">('+(mo<1?'أقل من شهر':mo+' شهر')+')</span>':'—')+'</td><td>'+(r.rate?'<span title="ترحيلات: '+r.defs+' من '+r.allow+' مسموح">'+tg(RT[r.rate][0],RT[r.rate][1])+'</span>':'—')+'</td><td>'+(r.income==null?'—':n(r.income))+'</td><td><span class="pay" style="margin:0;flex-wrap:nowrap">'+(canNew&&r.kind=='c'?'<button class="btn sm" data-ed="'+r.c.id+'">تعديل</button>':'')+(can('inv.create')&&r.kind=='c'&&(r.f.active||r.f.closed||r.f.legal)?'<button class="btn sm" data-vrf="'+r.c.id+'" title="يتسجل طلب في الاستعلامات وموظف الاستعلام ينزل زيارة">تأكيد البيانات</button>':'')+(can('cust.market')?mkBtn(mkObj(r,stg,mke)):'')+'</span></td></tr>'}).join('');
   $('#cmore').innerHTML=L.length?'<div class="pager"><button class="btn sm" data-cpg="-1"'+(F.pg<=1?' disabled':'')+'>السابق</button><span class="hint">صفحة '+F.pg+' من '+pc+' · '+L.length+' عميل</span><button class="btn sm" data-cpg="1"'+(F.pg>=pc?' disabled':'')+'>التالي</button></div>':'';return L}
  draw();
  function exp(sep){var L=filt(),head=['كود العميل','الاسم','الهاتف','الرقم القومي','العنوان','المنطقة','الفرع','نوع السكن','الدخل الشهري','الحالة','عدد العقود','موافقة تسويق','الموظف المسؤول'];
@@ -341,6 +341,9 @@ async function vCust(){
   if(t.getAttribute('data-cpg')){F.pg=(F.pg||1)+ +t.getAttribute('data-cpg');draw();$('#ct').scrollIntoView({behavior:'smooth'});return}
   if(t.getAttribute('data-mkk')){mkMark(t.getAttribute('data-mkk'),t.getAttribute('data-mks'));setTimeout(function(){t.classList.add('sent');t.innerHTML=WA_ICO+' اتبعت'},50);return}
   if(t.id=='mkb')return mkQueue();
+  if((a=t.getAttribute('data-vrf'))){var rr0=rows.filter(function(z){return z.kind=='c'&&z.c.id==a})[0]||{};var nt=prompt('طلب تأكيد بيانات «'+(rr0.name||'')+'»\nهيتسجل طلب في الاستعلامات ويروح على طول لمرحلة الزيارة الميدانية.\n\nملاحظة لموظف الاستعلام (اختياري):','');if(nt===null)return;
+   t.disabled=true;var xv=await sb.rpc('request_customer_verification',{p_customer:a,p_note:nt||null});t.disabled=false;if(xv.error)return msg(em(xv.error),1);
+   msg('تم تسجيل طلب تأكيد البيانات في الاستعلامات (مرحلة الزيارة الميدانية)');if(S.nav.indexOf('inv')>=0&&confirm('تفتح الطلب في الاستعلامات؟')){S.invOpen=S.invOpen||{};S.invOpen[xv.data]=true;S.invFlt='visit';return go('inv')}return}
   if(t.id=='mkt')return mkEdit(draw);
   if((a=t.getAttribute('data-ed'))){S.cedit=a;return vCust()}
   if(t.id=='cx'){S.cedit=null;return vCust()}
@@ -875,7 +878,7 @@ async function vLeads(){
 
 
 /* ---------- الاستعلامات: مراحل مترابطة (مستندات ← زيارة ← ائتمان ← قرار) ---------- */
-var IT={credit:'ائتماني',housing:'سكني',job:'وظيفي'};
+var IT={credit:'ائتماني',housing:'سكني',job:'وظيفي',verify:'تأكيد بيانات عميل حالي'};
 var IS={documents:'المستندات',visit:'الزيارة الميدانية',credit_review:'مراجعة الائتمان',approved:'موافق عليه',rejected:'مرفوض',cancelled:'ملغى'};
 var ACT=['documents','visit','credit_review'];
 var STG=['documents','visit','credit_review','decision'];
@@ -935,7 +938,7 @@ async function vInv(){
   return h}
  function card(i){
   var act=ACT.indexOf(i.status)>=0,lt=act&&i.due_date&&i.due_date<today,op=open[i.id]?' open':'';
-  var h='<details class="card" data-id="'+i.id+'"'+op+'><summary><div class="row"><b>'+esc(i.customer_name)+'</b><span>'+tg(IT[i.inv_type])+' '+(i.status=='approved'?(dlv(i)?tg('تم التسليم','t0')+' ':tg('لم يستلم','t1')+' '):'')+tg(IS[i.status],i.status=='approved'?'t0':i.status=='documents'||i.status=='visit'||i.status=='credit_review'?(lt?'t2':'t1'):'t2')+'</span></div>'+stepper(i.status)+'<div class="hint">'+esc(i.customer_phone)+' · '+esc(bn(i.branch_id))+' · أنشأه '+esc(un(i.created_by))+' · '+fd(i.created_at)+(lt?' · <b style="color:var(--rd)">متأخر</b>':'')+'</div></summary>';
+  var h='<details class="card" data-id="'+i.id+'"'+op+'><summary><div class="row"><b>'+esc(i.customer_name)+'</b><span>'+tg(IT[i.inv_type]||i.inv_type,i.inv_type=='verify'?'t0':'')+' '+(i.status=='approved'?(dlv(i)?tg('تم التسليم','t0')+' ':tg('لم يستلم','t1')+' '):'')+tg(IS[i.status],i.status=='approved'?'t0':i.status=='documents'||i.status=='visit'||i.status=='credit_review'?(lt?'t2':'t1'):'t2')+'</span></div>'+stepper(i.status)+'<div class="hint">'+esc(i.customer_phone)+' · '+esc(bn(i.branch_id))+' · أنشأه '+esc(un(i.created_by))+' · '+fd(i.created_at)+(lt?' · <b style="color:var(--rd)">متأخر</b>':'')+'</div></summary>';
   h+='<div class="hint">رقم قومي: '+esc(i.national_id)+' · العنوان: '+esc(i.customer_address)+'</div>';
   if(i.returned_reason&&act)h+='<div class="alert bad">أُعيد من الائتمان: '+esc(i.returned_reason)+'</div>';
   if(i.status=='cancelled')h+='<div class="alert bad">ملغى: '+esc(i.cancel_reason)+'</div>';
@@ -943,7 +946,7 @@ async function vInv(){
   if(i.status=='documents'&&creator&&(allInv||i.created_by==S.me.id)){
    h+=appForm(i)+docs(i)+'<div class="pay"><button class="btn" data-sva="'+i.id+'">حفظ البيانات</button><button class="btn am" data-tov="'+i.id+'">اعتماد وإرسال للزيارة الميدانية</button></div>';
   }else if(i.status=='documents'){h+='<div class="hint">بانتظار استكمال البيانات والمستندات.</div>'+docs(i)}
-  else h+=docs(i);
+  else{if(i.inv_type=='verify'&&i.status=='visit'&&visitor&&(i.assigned_agent==S.me.id||mgr||role=='system_admin'))h+='<div class="alert"><b>طلب تأكيد بيانات عميل حالي</b><br>راجع بيانات العميل في الزيارة وعدّل أي حاجة اتغيرت (العنوان، الهاتف، السكن، الشغل، الدخل، الضامن). بعد موافقة الائتمان البيانات الجديدة بتتحدث في ملف العميل.</div>'+appForm(i)+'<div class="pay"><button class="btn" data-sva="'+i.id+'">حفظ البيانات المعدلة</button></div>';h+=docs(i)}
   if(i.status=='visit'){
    if(mgr)h+='<div class="pay"><select id="ag'+i.id+'" aria-label="المسؤول">'+opts(S.profiles.filter(function(p){return p.active&&pcan(p,'inv.visit')}),'id','full_name',i.assigned_agent,'اختر مسؤول الاستعلام')+'</select><input type="date" id="dd'+i.id+'" value="'+(i.due_date||addDays(3))+'" aria-label="الموعد"><button class="btn am" data-asg="'+i.id+'">إسناد</button></div>';
    h+='<div class="hint">المسؤول: '+(i.assigned_agent?esc(un(i.assigned_agent)):'غير مُسند')+' · الموعد: '+fd(i.due_date)+(i.visit_at?' · الزيارة: '+fd(i.visit_at):'')+(i.visit_lat?' · <a href="https://www.openstreetmap.org/?mlat='+i.visit_lat+'&mlon='+i.visit_lng+'#map=17/'+i.visit_lat+'/'+i.visit_lng+'" target="_blank" rel="noopener">الموقع على الخريطة</a>':'')+'</div>';
