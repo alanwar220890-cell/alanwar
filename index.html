@@ -151,6 +151,15 @@ function go(v){if(!v)return;S.cur=v;
  $('#v').onclick=null;$('#v').onchange=null;$('#v').innerHTML='<p class="hint">جارٍ التحميل…</p>';
  ({dash:vDash,cust:vCust,con:vCon,coll:vColl,adm:vAdm,leads:vLeads,inv:vInv,legal:vLegal,tgt:vTgt,task:vTasks,fin:vFin,camp:vCamp,ai:vAI,kb:vKB,integ:vInt})[v]().catch(function(e){$('#v').innerHTML='<div class="card">'+esc(em(e))+'</div>'})
 }
+function askPw(title){return new Promise(function(res){
+ var m=document.createElement('div');m.className='md';m.style.zIndex=40;
+ m.innerHTML='<div class="card" style="max-width:420px;margin:12vh auto 0"><h2>تأكيد بكلمة المرور</h2><p>'+title+'</p><p class="hint">اكتب كلمة مرور حسابك علشان نتأكد إنك صاحب الحساب.</p><input type="password" id="pwc" autocomplete="current-password" aria-label="كلمة المرور"><div class="pay"><button class="btn rd" id="pwok">تأكيد الإلغاء</button><button class="btn" id="pwno">رجوع</button></div></div>';
+ document.body.appendChild(m);var i=m.querySelector('#pwc');i.focus();
+ var done=function(v){m.remove();res(v)};
+ m.querySelector('#pwok').onclick=function(){if(!i.value)return msg('اكتب كلمة المرور',1);done(i.value)};
+ m.querySelector('#pwno').onclick=function(){done(null)};
+ i.onkeydown=function(e){if(e.key=='Enter')m.querySelector('#pwok').click();if(e.key=='Escape')done(null)};
+ m.onclick=function(e){if(e.target===m)done(null)}})}
 function accPanel(){
  var old=$('#cm');if(old)old.remove();var m=document.createElement('div');m.id='cm';m.className='md';var br=bn(S.me.branch_id),mine=effPerms(Object.assign({},S.me,{perms:S.me.role=='system_admin'?null:S.perms}));
  m.innerHTML='<div class="card"><div class="row"><h2>حسابي</h2><button class="btn" data-clo="1">إغلاق</button></div><table class="kv"><tr><th>الاسم</th><td>'+esc(S.me.full_name)+'</td></tr><tr><th>الوظيفة</th><td>'+esc(RL[S.me.role])+'</td></tr><tr><th>الفرع</th><td>'+(esc(br)||'—')+'</td></tr><tr><th>البريد (لتسجيل الدخول)</th><td dir="ltr" style="text-align:right">'+esc(S.me.email||'—')+'</td></tr></table><h3>صلاحياتي</h3>'+PG.map(function(g){var l=g.p.filter(function(x){return mine.indexOf(x[0])>=0});return l.length?'<div class="pgx"><b>'+pico(g.ic)+' '+g.t+'</b><div class="pchips">'+l.map(function(x){return '<span class="pchip on">'+pico(x[2])+esc(x[1])+'</span>'}).join('')+'</div></div>':''}).join('')+'</div>';
@@ -494,8 +503,8 @@ async function conPopup(id,after){
    if(!(am>0))return msg('اكتب المبلغ',1);if(!dt)return msg('اختر تاريخ التحصيل',1);if(dt>today)return msg('تاريخ التحصيل لا يمكن أن يكون في المستقبل',1);if(!who||who=='—')return msg('اكتب اسم المحصّل',1);
    var sq=t.closest('tr')&&t.closest('tr').firstChild.textContent;if(!confirm('تأكيد تسجيل تحصيل مبلغ '+n(am)+' ج.م على القسط رقم '+sq+'\nبتاريخ '+fd(dt)+' — المحصّل: '+who+'؟'))return;
    t.disabled=true;var px=await sb.rpc('pay_installment',{p_inst:a,p_amount:am,p_paid_at:dt+'T12:00:00+02:00',p_collector:who});t.disabled=false;if(px.error)return msg(em(px.error),1);msg('تم تسجيل التحصيل');return conPopup(id,after)}
-  if((a=t.getAttribute('data-cxi'))){if(!confirm('إلغاء تحصيل القسط رقم '+t.getAttribute('data-cxs')+' بمبلغ '+n(+t.getAttribute('data-cxa'))+' ج.م؟\nالمبلغ هيرجع متبقي على العميل.'))return;
-   t.disabled=true;var cx2=await sb.rpc('cancel_installment_collection',{p_inst:a});t.disabled=false;if(cx2.error)return msg(em(cx2.error),1);msg('تم إلغاء تحصيل القسط');return conPopup(id,after)}
+  if((a=t.getAttribute('data-cxi'))){var pw=await askPw('إلغاء تحصيل القسط رقم <b>'+esc(t.getAttribute('data-cxs'))+'</b> بمبلغ <b>'+n(+t.getAttribute('data-cxa'))+'</b> ج.م. المبلغ هيرجع متبقي على العميل.');if(!pw)return;
+   t.disabled=true;var cx2=await sb.rpc('cancel_installment_collection',{p_inst:a,p_password:pw});t.disabled=false;if(cx2.error)return msg(em(cx2.error),1);msg('تم إلغاء تحصيل القسط');return conPopup(id,after)}
   if(t.getAttribute('data-sn')){var x0=await sb.from('contracts').update({sale_notes:m.querySelector('#kn2').value.trim()||null}).eq('id',id);if(x0.error)return msg(em(x0.error),1);msg('تم الحفظ');return conPopup(id,after)}}
 }
 async function vColl(){
@@ -513,7 +522,7 @@ async function vColl(){
  draw();$('#fs').onchange=draw;$('#fq').oninput=draw;
  v.onclick=async function(e){var t=e.target,lg=t.getAttribute('data-leg'),f=t.getAttribute('data-f'),c=t.getAttribute('data-c');
   if(f)return conPopup(f,vColl);
-  var cp=t.getAttribute('data-cxp');if(cp){if(!confirm('إلغاء التحصيل بمبلغ '+n(+t.getAttribute('data-cxa'))+' ج.م؟\nالمبلغ هيرجع متبقي على العميل.'))return;t.disabled=true;var cr=await sb.rpc('cancel_payment',{p_payment:cp});t.disabled=false;if(cr.error)return msg(em(cr.error),1);msg('تم إلغاء التحصيل');return vColl()}
+  var cp=t.getAttribute('data-cxp');if(cp){var pw=await askPw('إلغاء التحصيل بمبلغ <b>'+n(+t.getAttribute('data-cxa'))+'</b> ج.م. المبلغ هيرجع متبقي على العميل.');if(!pw)return;t.disabled=true;var cr=await sb.rpc('cancel_payment',{p_payment:cp,p_password:pw});t.disabled=false;if(cr.error)return msg(em(cr.error),1);msg('تم إلغاء التحصيل');return vColl()}
   if(lg){var w=$('#lw'+lg).value;if(!w)return msg('اختر المحامي أو مندوب التحصيل',1);if(!confirm('تحويل العميل للشؤون القانونية؟ سيخرج من قائمة المتأخرين.'))return;var rr=await sb.rpc('legal_refer',{p_contract:lg,p_assignee:w,p_reason:$('#lr'+lg).value.trim()||null});if(rr.error)return msg(em(rr.error),1);msg('تم التحويل للشؤون القانونية');return vColl()}
   if(c){t.disabled=true;var ok=await payDo(t.closest('.card'),c,c,t.getAttribute('data-b'));t.disabled=false;if(ok)vColl()}}
 }
