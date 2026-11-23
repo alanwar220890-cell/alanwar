@@ -528,6 +528,7 @@ async function vCon(){
   if(['kt','kst','kfd'].indexOf(t.id)>=0)sch();
   if(t.id=='kp'){var p=S.products.filter(function(x){return x.id==t.value})[0];if(p){$('#ka').value=p.annual_rate;sch()}}
   if(t.id=='kc')setCust(cust())};
+ if(S.leadPre&&$('#knc')){var lp0=S.leadPre;S.leadPre=null;$('#knc').style.display='';$('#ncn').value=lp0.name||'';$('#ncp').value=lp0.phone||'';if($('#ncb')&&lp0.branch)$('#ncb').value=lp0.branch;if(lp0.notes&&$('#kn'))$('#kn').value='من العملاء المحتملين: '+lp0.notes;$('#knc').scrollIntoView({behavior:'smooth',block:'center'});msg('كمّل بيانات العميل (الاسم 4 كلمات والرقم القومي) وبعدين بيانات العقد')}
  if(S.conPre&&$('#kc')){var pc=cu.filter(function(x){return x.national_id==S.conPre})[0];S.conPre=null;if(pc){$('#kc').innerHTML=opts([pc],'id',function(x){return x.full_name},pc.id,'');$('#kc').value=pc.id;setCust(pc)}}
  async function activate(id,closed){var x=await sb.rpc('contract_activate',{p_contract:id,p_closed:!!closed});if(x.error){msg(em(x.error),1);return false}return true}
  v.onclick=async function(e){var t=e.target,a;
@@ -789,28 +790,85 @@ async function dashExtra(){
 }
 
 /* ---------- المبيعات: العملاء المحتملون ---------- */
-var LS={new:'جديد',follow_up:'متابعة',qualified:'مؤهل',converted:'تم التحويل',lost:'خسارة'};
+var LS={new:'جديد',follow_up:'متابعة',qualified:'مؤهل (مهتم جدًا)',converted:'اشترى',lost:'غير مهتم'};
+var LSRC=['إعلان ممول','فيسبوك','واتساب','زيارة فرع','اتصال مباشر','ترشيح عميل','أخرى'];
+var LHEAD=['الاسم','الهاتف','المصدر','الاهتمام / المنتج','ملاحظات','موعد المتابعة','موعد زيارة الفرع','الفرع'];
 async function vLeads(){
- var v=$('#v'),role=S.me.role,canNew=can('leads.edit'),mgr=can('leads.assign');
- var L=chk(await sb.from('leads').select('*').order('created_at',{ascending:false}).limit(500));
- var cnt={new:0,follow_up:0,qualified:0,converted:0,lost:0};L.forEach(function(x){cnt[x.status]++});
- var conv=L.length?Math.round(cnt.converted/L.length*100):0;
- var form=canNew?'<div class="card"><h2>عميل محتمل جديد</h2><div class="f"><div><label for="ln">الاسم</label><input id="ln"></div><div><label for="lp">الهاتف</label><input id="lp" inputmode="tel"></div><div><label for="ls">المصدر</label><select id="ls"><option>اتصال مباشر</option><option>واتساب</option><option>فيسبوك</option><option>زيارة فرع</option><option>ترشيح عميل</option></select></div><div><label for="lf">موعد المتابعة</label><input id="lf" type="date"></div>'+(pickBr()?'<div><label for="lb">الفرع</label><select id="lb">'+opts(S.branches,'id','name','','اختر')+'</select></div>':'')+'</div><div style="margin-top:8px"><label for="lt">ملاحظات</label><input id="lt"></div><button class="btn am" id="la" style="margin-top:10px">حفظ</button></div>':'';
- v.innerHTML='<div class="k"><div><b>'+L.length+'</b><span>إجمالي العملاء المحتملين</span></div><div><b>'+cnt.new+'</b><span>جدد</span></div><div><b>'+cnt.follow_up+'</b><span>قيد المتابعة</span></div><div><b>'+cnt.converted+'</b><span>تم تحويلهم</span></div><div><b>'+conv+'%</b><span>معدل التحويل</span></div></div>'+form+
- '<div class="card"><h2>المتابعة</h2><div class="wrap"><table><tr><th>الاسم</th><th>الهاتف</th><th>المصدر</th><th>الحالة</th><th>المتابعة القادمة</th><th>المسؤول</th><th>ملاحظات</th></tr>'+L.map(function(x){
-  var late=x.next_followup&&x.next_followup<today&&(x.status=='new'||x.status=='follow_up');
-  var as=mgr?'<select data-la="'+x.id+'">'+opts(S.profiles.filter(function(p){return p.active&&pcan(p,'leads.edit')&&(p.branch_id==x.branch_id||pcan(p,'all_branches'))}),'id','full_name',x.assigned_to,'—')+'</select>':esc(un(x.assigned_to));
-  return '<tr><td>'+esc(x.full_name)+'</td><td>'+esc(x.phone)+'</td><td>'+esc(x.source)+'</td><td>'+(canNew?'<select data-ls="'+x.id+'">'+Object.keys(LS).map(function(k){return '<option value="'+k+'"'+(k==x.status?' selected':'')+'>'+LS[k]+'</option>'}).join('')+'</select>':tg(LS[x.status]))+'</td><td><input type="date" data-lf="'+x.id+'" value="'+(x.next_followup||'')+'"'+(canNew?'':' disabled')+(late?' style="border-color:var(--rd)"':'')+'></td><td>'+as+'</td><td>'+esc(x.notes)+'</td></tr>'}).join('')+'</table></div></div>';
- v.onchange=function(e){var t=e.target,a;
-  if((a=t.getAttribute('data-ls')))upd('leads',a,{status:t.value});
-  else if((a=t.getAttribute('data-lf')))upd('leads',a,{next_followup:t.value||null});
-  else if((a=t.getAttribute('data-la')))upd('leads',a,{assigned_to:t.value||null})};
- if(canNew)$('#la').onclick=async function(){
-  var nm=$('#ln').value.trim();if(!nm)return msg('اكتب الاسم',1);
-  var bid=pickBr()?$('#lb').value:S.me.branch_id;if(!bid)return msg('حدد الفرع',1);
-  var x=await sb.from('leads').insert({branch_id:bid,full_name:nm,phone:$('#lp').value.trim()||null,source:$('#ls').value,next_followup:$('#lf').value||null,notes:$('#lt').value.trim()||null,assigned_to:S.me.id});
-  if(x.error)return msg(em(x.error),1);msg('تم الحفظ');vLeads()}
+ var v=$('#v'),canNew=can('leads.edit'),mgr=can('leads.assign'),G=S.lf=S.lf||{st:'open',vis:'',emp:'',src:'',q:'',so:'new',ps:10,pg:1};
+ var R0=await Promise.all([cuAll(function(){return sb.from('leads').select('*').order('created_at',{ascending:false})}),cuAll(function(){return sb.from('customers').select('phone')})]);
+ var L=R0[0],CPH={};(R0[1]||[]).forEach(function(c){if(c.phone)CPH[cuDig(c.phone).replace(/[^0-9]/g,'')]=1});
+ var staff=S.profiles.filter(function(p){return p.active&&pcan(p,'leads.edit')});
+ var cnt={new:0,follow_up:0,qualified:0,converted:0,lost:0};L.forEach(function(x){cnt[x.status]=(cnt[x.status]||0)+1});
+ var conv=L.length?Math.round(cnt.converted/L.length*100):0,in3=addDays(3),vToday=L.filter(function(x){return x.visit_date==today&&x.status!='converted'}).length,vSoon=L.filter(function(x){return x.visit_date&&x.visit_date>=today&&x.visit_date<=in3&&x.status!='converted'}).length;
+ var form=canNew?'<details class="card"'+(S.lOpen?' open':'')+'><summary><b>عميل محتمل جديد</b></summary><div class="f"><div><label for="ln">الاسم</label><input id="ln"></div><div><label for="lp">الهاتف</label><input id="lp" inputmode="tel" maxlength="11"></div><div><label for="ls">المصدر</label><select id="ls">'+LSRC.map(function(x){return '<option>'+x+'</option>'}).join('')+'</select></div><div><label for="li">الاهتمام / المنتج</label><input id="li" placeholder="مثلًا: ثلاجة 16 قدم"></div><div><label for="lf">موعد المتابعة</label><input id="lf" type="date"></div><div><label for="lv">موعد زيارة الفرع</label><input id="lv" type="date"></div>'+(pickBr()?'<div><label for="lb">الفرع</label><select id="lb">'+opts(S.branches,'id','name',S.me.branch_id||'','اختر')+'</select></div>':'')+(mgr?'<div><label for="lw">الموظف المسؤول</label><select id="lw">'+opts(staff,'id','full_name',S.me.id,'')+'</select></div>':'')+'</div><div style="margin-top:8px"><label for="lt">ملاحظات</label><input id="lt"></div><button class="btn am" id="la" style="margin-top:10px">حفظ</button></details>':'';
+ var imp=canNew||mgr?'<details class="card"><summary><b>استيراد وتصدير العملاء المحتملين</b></summary><div class="pay"><button class="btn" id="lex">تصدير المعروض (CSV)</button>'+(canNew?'<button class="btn" id="lx0">تنزيل قالب الاستيراد</button>':'')+'</div>'+(canNew?'<ol class="hint"><li>نزّل القالب واملأه بداتا الإعلان أو زوار الفرع، أو صدّر الشيت بنفس العناوين.</li><li>اختار الموظف اللي هتتوزع عليه الداتا دي، وهو بس اللي هيشوفها ويتابعها.</li><li>دوس «فحص» وبعدين «استيراد». الأرقام المكررة أو اللي اشترت مننا قبل كده بتتشال لوحدها.</li></ol><div class="f">'+(mgr?'<div><label for="liw">الموظف اللي هتتوزع عليه الداتا</label><select id="liw">'+opts(staff,'id','full_name',S.me.id,'')+'</select></div>':'')+(pickBr()?'<div><label for="lib">الفرع الافتراضي</label><select id="lib">'+opts(S.branches,'id','name',S.me.branch_id||'','اختر')+'</select></div>':'')+'<div><label for="lis">المصدر الافتراضي</label><select id="lis">'+LSRC.map(function(x){return '<option>'+x+'</option>'}).join('')+'</select></div></div><div class="pay"><input type="file" id="lfile" accept=".csv,.txt,.tsv,text/csv" aria-label="ملف CSV"></div><label for="lpaste" style="margin-top:8px">أو الصق البيانات هنا</label><textarea id="lpaste" rows="4"></textarea><div class="pay"><button class="btn" id="lchk">فحص</button><button class="btn am" id="lgo" disabled>استيراد</button></div><div id="lres"></div>':'')+'</details>':'';
+ v.innerHTML='<div class="k"><div><b>'+L.length+'</b><span>'+(mgr?'إجمالي العملاء المحتملين':'العملاء المحتملين بتوعك')+'</span></div><div><b>'+cnt.new+'</b><span>جدد</span></div><div><b>'+(cnt.follow_up+cnt.qualified)+'</b><span>قيد المتابعة</span></div><div><b>'+vToday+'</b><span>زيارات النهارده</span></div><div><b>'+vSoon+'</b><span>زيارات خلال 3 أيام</span></div><div><b>'+cnt.converted+'</b><span>اشتروا ('+conv+'%)</span></div></div>'+form+imp+
+  '<div class="card"><h2>المتابعة</h2><div class="f"><div><label for="gst">الحالة</label><select id="gst"><option value="open">المفتوحين (جديد ومتابعة ومؤهل)</option><option value="">الكل</option>'+Object.keys(LS).map(function(k){return '<option value="'+k+'">'+LS[k]+'</option>'}).join('')+'</select></div><div><label for="gvis">مواعيد زيارة الفرع</label><select id="gvis"><option value="">الكل</option><option value="today">النهارده</option><option value="3">خلال 3 أيام</option><option value="7">خلال أسبوع</option><option value="any">ليهم موعد قادم</option><option value="missed">فات موعدهم ومجوش</option></select></div><div><label for="gso">الترتيب</label><select id="gso"><option value="new">الأحدث إضافة</option><option value="old">إعادة استهداف: الأقدم تواصلًا أولًا</option><option value="visit">أقرب موعد زيارة</option><option value="fu">أقرب موعد متابعة</option></select></div><div><label for="gsrc">المصدر</label><select id="gsrc"><option value="">الكل</option>'+LSRC.map(function(x){return '<option>'+x+'</option>'}).join('')+'</select></div>'+(mgr?'<div><label for="gemp">الموظف</label><select id="gemp"><option value="">كل الموظفين</option>'+staff.map(function(p){return '<option value="'+p.id+'">'+esc(p.full_name)+'</option>'}).join('')+'</select></div>':'')+'<div><label for="gq">بحث</label><input id="gq" placeholder="اسم أو هاتف" value="'+esc(G.q)+'"></div><div><label for="gps">العدد في الصفحة</label><select id="gps">'+[5,10,15,20,30,40,50].map(function(x){return '<option'+(x==G.ps?' selected':'')+'>'+x+'</option>'}).join('')+'</select></div></div><div id="gl"></div></div>';
+ ['gst','gvis','gso','gsrc','gemp','gps'].forEach(function(id){var e2=$('#'+id);if(e2){var k={gst:'st',gvis:'vis',gso:'so',gsrc:'src',gemp:'emp',gps:'ps'}[id];e2.value=G[k]}});
+ function filt(){var q=cuNorm(cuDig(G.q)).toLowerCase(),d7=addDays(7),out=L.filter(function(x){
+   if(G.st=='open'?['new','follow_up','qualified'].indexOf(x.status)<0:G.st&&x.status!=G.st)return false;
+   if(G.src&&x.source!=G.src)return false;if(G.emp&&x.assigned_to!=G.emp)return false;
+   if(G.vis){var vd=x.visit_date;if(!vd)return false;if(G.vis=='today'&&vd!=today)return false;if(G.vis=='3'&&(vd<today||vd>in3))return false;if(G.vis=='7'&&(vd<today||vd>d7))return false;if(G.vis=='any'&&vd<today)return false;if(G.vis=='missed'&&(vd>=today||x.status=='converted'))return false}
+   if(q&&cuNorm(x.full_name||'').toLowerCase().indexOf(q)<0&&String(x.phone||'').indexOf(q)<0)return false;return true});
+  var key={old:function(x){return (x.last_contact_at||x.created_at||'')},visit:function(x){return x.visit_date||'9999'},fu:function(x){return x.next_followup||'9999'}}[G.so];
+  if(key)out.sort(function(a,b){var p1=key(a),p2=key(b);return p1<p2?-1:p1>p2?1:0});return out}
+ function card(x){var late=x.next_followup&&x.next_followup<today&&['new','follow_up','qualified'].indexOf(x.status)>=0,vm=x.visit_date&&x.visit_date<today&&x.status!='converted',vt=x.visit_date==today;
+  var ed=canNew&&(x.assigned_to==S.me.id||mgr),lc=x.last_contact_at?Math.floor((new Date()-new Date(x.last_contact_at))/864e5):null;
+  return '<div class="card" data-l="'+x.id+'"><div class="row"><b>'+esc(x.full_name)+'</b><span>'+tg(LS[x.status]||x.status,x.status=='converted'?'t0':x.status=='lost'?'':'t1')+(vt?' '+tg('زيارة النهارده','t0'):vm?' '+tg('فات موعد الزيارة','t2'):'')+'</span></div>'+
+   '<div class="hint"><bdi>'+esc(x.phone||'—')+'</bdi> · '+esc(x.source||'—')+(x.interest?' · مهتم بـ: '+esc(x.interest):'')+' · '+esc(bn(x.branch_id))+' · المسؤول: '+esc(un(x.assigned_to))+' · اتسجل '+fd(x.created_at)+' · '+(lc==null?'لسه متواصلناش':'آخر تواصل من '+lc+' يوم ('+x.contact_count+' مرة)')+'</div>'+
+   (x.notes?'<div class="hint" style="white-space:pre-line;border-right:3px solid var(--ln);padding-right:8px;margin-top:4px">'+esc(x.notes)+'</div>':'')+
+   (ed?'<div class="f" style="margin-top:6px"><div><label>الحالة</label><select data-ls="'+x.id+'">'+Object.keys(LS).map(function(k){return '<option value="'+k+'"'+(k==x.status?' selected':'')+'>'+LS[k]+'</option>'}).join('')+'</select></div><div><label>موعد المتابعة</label><input type="date" data-lf="'+x.id+'" value="'+(x.next_followup||'')+'"'+(late?' style="border-color:var(--rd)"':'')+'></div><div><label>موعد زيارة الفرع</label><input type="date" data-lv="'+x.id+'" value="'+(x.visit_date||'')+'"'+(vm?' style="border-color:var(--rd)"':'')+'></div>'+(mgr?'<div><label>المسؤول</label><select data-la="'+x.id+'">'+opts(staff.filter(function(p){return p.branch_id==x.branch_id||!p.branch_id||pcan(p,'all_branches')}),'id','full_name',x.assigned_to,'—')+'</select></div>':'')+'</div>'+
+   '<div class="pay"><input id="ln_'+x.id+'" placeholder="نتيجة التواصل (اختياري)"><button class="btn" data-lc="'+x.id+'">سجّل تواصل</button>'+(waPhone(x.phone)?'<a class="btn wa" href="https://wa.me/'+waPhone(x.phone)+'" target="_blank" rel="noopener" data-lwa="'+x.id+'">'+WA_ICO+' واتساب</a>':'')+(x.status!='converted'?'<button class="btn am" data-lbuy="'+x.id+'">اشترى — اعمله عقد</button>':'')+'</div>':'')+'</div>'}
+ function draw(){var l=filt(),ps=+G.ps||10,pc=Math.max(1,Math.ceil(l.length/ps));G.pg=Math.min(Math.max(1,G.pg||1),pc);var vis=l.slice((G.pg-1)*ps,G.pg*ps);S.lVis=l;
+  $('#gl').innerHTML=(l.length?vis.map(card).join('')+'<div class="pager"><button class="btn sm" data-lpg="-1"'+(G.pg<=1?' disabled':'')+'>السابق</button><span class="hint">صفحة '+G.pg+' من '+pc+' · '+l.length+' عميل</span><button class="btn sm" data-lpg="1"'+(G.pg>=pc?' disabled':'')+'>التالي</button></div>':'<p class="hint">مفيش عملاء مطابقين.</p>')}
+ draw();
+ v.oninput=function(e){if(e.target.id=='gq'){G.q=e.target.value;G.pg=1;draw()}};
+ v.onchange=async function(e){var t=e.target,a,m={gst:'st',gvis:'vis',gso:'so',gsrc:'src',gemp:'emp',gps:'ps'};
+  if(m[t.id]){G[m[t.id]]=t.value;G.pg=1;return draw()}
+  if(t.id=='lfile'&&t.files[0]){var fr=new FileReader();fr.onload=function(){$('#lpaste').value=fr.result;$('#lchk').click()};fr.readAsText(t.files[0],'utf-8');return}
+  var o=null;if((a=t.getAttribute('data-ls'))){o={status:t.value};if(t.value=='converted')o.converted_at=new Date().toISOString()}else if((a=t.getAttribute('data-lf')))o={next_followup:t.value||null};else if((a=t.getAttribute('data-lv')))o={visit_date:t.value||null};else if((a=t.getAttribute('data-la')))o={assigned_to:t.value||null};
+  if(o){var x=await sb.from('leads').update(o).eq('id',a);if(x.error)return msg(em(x.error),1);var l0=L.filter(function(z){return z.id==a})[0];if(l0)Object.assign(l0,o);msg('تم الحفظ')}};
+ v.onclick=async function(e){var t=e.target.closest('button,a')||e.target,a;
+  if((a=t.getAttribute('data-lpg'))){G.pg+= +a;draw();$('#gl').scrollIntoView({behavior:'smooth'});return}
+  if((a=t.getAttribute('data-lc'))||(a=t.getAttribute('data-lwa'))){var l0=L.filter(function(z){return z.id==a})[0],nt=$('#ln_'+a)?$('#ln_'+a).value.trim():'',via=t.getAttribute('data-lwa')?'واتساب':'';
+   var o={last_contact_at:new Date().toISOString(),contact_count:(l0.contact_count||0)+1};if(l0.status=='new')o.status='follow_up';if(nt||via)o.notes=((l0.notes?l0.notes+'\n':'')+today+' — '+(via?'تواصل واتساب':'تواصل')+(nt?': '+nt:'')).slice(-4000);
+   var x=await sb.from('leads').update(o).eq('id',a);if(x.error)return msg(em(x.error),1);Object.assign(l0,o);if(!via){msg('تم تسجيل التواصل');draw()}else setTimeout(draw,300);return}
+  if((a=t.getAttribute('data-lbuy'))){var l1=L.filter(function(z){return z.id==a})[0];if(!confirm('تسجيل إن «'+l1.full_name+'» اشترى، وفتح العقود علشان تضيفه وتعمله عقد؟'))return;
+   var x2=await sb.from('leads').update({status:'converted',converted_at:new Date().toISOString()}).eq('id',a);if(x2.error)return msg(em(x2.error),1);
+   S.leadPre={name:l1.full_name,phone:l1.phone,branch:l1.branch_id,notes:[l1.interest,l1.source].filter(Boolean).join(' — ')};
+   if(S.nav.indexOf('con')<0||!can('con.create'))return msg('اتسجل إنه اشترى. معندكش صلاحية إنشاء العقود، كلم المسؤول يعمله العقد',1);
+   return go('con')}
+  if(t.id=='la'){var nm=$('#ln').value.trim();if(!nm)return msg('اكتب الاسم',1);var ph=cuDig($('#lp').value).replace(/[^0-9]/g,'');if(/^1[0-9]{9}$/.test(ph))ph='0'+ph;
+   if(ph&&CPH[ph]&&!confirm('الرقم ده مسجل لعميل اشترى مننا قبل كده. تكمل؟'))return;if(ph&&L.some(function(z){return cuDig(z.phone||'').replace(/[^0-9]/g,'')==ph})&&!confirm('الرقم ده موجود قبل كده في العملاء المحتملين. تكمل؟'))return;
+   var bid=pickBr()?$('#lb').value:S.me.branch_id;if(!bid)return msg('حدد الفرع',1);
+   var x3=await sb.from('leads').insert({branch_id:bid,full_name:nm,phone:ph||null,source:$('#ls').value,interest:$('#li').value.trim()||null,next_followup:$('#lf').value||null,visit_date:$('#lv').value||null,notes:$('#lt').value.trim()||null,assigned_to:mgr&&$('#lw')?$('#lw').value||S.me.id:S.me.id});
+   if(x3.error)return msg(em(x3.error),1);S.lOpen=1;msg('تم الحفظ');return vLeads()}
+  if(t.id=='lx0'){return dl('قالب-استيراد-العملاء-المحتملين.csv',['# صف لكل عميل. الأسطر اللي بتبدأ بـ # مش بتتستورد. التاريخ بالشكل 2026-12-01 أو 01/12/2026.',LHEAD.map(cuQ).join(','),['مثال-1 أحمد علي','01012345678','إعلان ممول','غسالة 10 كيلو','سأل على التقسيط من غير مقدم','2026-12-01','2026-12-03',(S.branches[0]||{}).name||''].map(cuQ).join(',')].join('\r\n'))}
+  if(t.id=='lex'){var EL=S.lVis||[];if(!EL.length)return msg('مفيش نتائج للتصدير',1);var hd=LHEAD.concat(['الحالة','الموظف','آخر تواصل','عدد مرات التواصل','تاريخ التسجيل']);
+   return dl('العملاء-المحتملين-'+today+'.csv',[hd.map(cuQ).join(',')].concat(EL.map(function(x){return [x.full_name,x.phone||'',x.source||'',x.interest||'',String(x.notes||'').replace(/[\r\n]+/g,' | '),x.next_followup||'',x.visit_date||'',bn(x.branch_id),LS[x.status]||x.status,un(x.assigned_to),x.last_contact_at?String(x.last_contact_at).slice(0,10):'',x.contact_count||0,String(x.created_at||'').slice(0,10)].map(function(z){return cuQ(String(z))}).join(',')})).join('\r\n'))}
+  if(t.id=='lchk'){var rs=cuParse($('#lpaste').value);if(rs.length<2)return msg('مفيش بيانات. تأكد من صف العناوين',1);
+   var hd2=rs[0].map(function(h){return cuNorm(h)}),ix={};[['name','الاسم','اسم العميل','name'],['phone','الهاتف','رقم الهاتف','الموبايل','phone'],['src','المصدر','source'],['int','الاهتمام / المنتج','الاهتمام','المنتج'],['notes','ملاحظات'],['fu','موعد المتابعة'],['vis','موعد زيارة الفرع','موعد الزيارة'],['br','الفرع']].forEach(function(m2){for(var j=1;j<m2.length;j++){var q2=hd2.indexOf(cuNorm(m2[j]));if(q2>=0){ix[m2[0]]=q2;break}}});
+   if(ix.name==null&&ix.phone==null)return msg('لازم عمود «الاسم» أو «الهاتف»',1);
+   var bmap={};S.branches.forEach(function(b){bmap[cuNorm(b.name)]=b.id});var exP={};L.forEach(function(z){var p=cuDig(z.phone||'').replace(/[^0-9]/g,'');if(p)exP[p]=1});
+   var defB=pickBr()?$('#lib').value:S.me.branch_id,who=mgr&&$('#liw')?$('#liw').value||S.me.id:S.me.id,ok=[],bad=[],seen={};
+   rs.slice(1).forEach(function(r,k){var g=function(key){return ix[key]==null?'':String(r[ix[key]]==null?'':r[ix[key]]).trim()},er=[];
+    var ph=cuDig(g('phone')).replace(/[^0-9]/g,'');if(/^1[0-9]{9}$/.test(ph))ph='0'+ph;if(/^20(1[0-9]{9})$/.test(ph))ph='0'+ph.slice(2);
+    var nm=g('name').replace(/\s+/g,' ');if(!nm&&!ph)return;if(!nm)nm='عميل '+ph;
+    if(ph&&!/^01[0-9]{9}$/.test(ph))er.push('رقم الهاتف غير صحيح');
+    if(ph&&CPH[ph])er.push('اشترى مننا قبل كده');if(ph&&(exP[ph]||seen[ph]))er.push('الرقم مكرر');
+    var bs=g('br'),bid=bs?bmap[cuNorm(bs)]:defB;if(bs&&!bid)er.push('الفرع غير معروف');else if(!bid)er.push('حدد الفرع');
+    var fu=kDate(g('fu')),vs=kDate(g('vis'));if(fu===null)er.push('موعد المتابعة غير صحيح');if(vs===null)er.push('موعد الزيارة غير صحيح');
+    if(er.length)bad.push({r:r,e:er.join(' + '),line:k+2,nm:nm});else{if(ph)seen[ph]=1;ok.push({full_name:nm,phone:ph||null,source:g('src')||$('#lis').value,interest:g('int')||null,notes:g('notes')||null,next_followup:fu||null,visit_date:vs||null,branch_id:bid,assigned_to:who,status:'new'})}});
+   S.lplan={ok:ok,bad:bad,head:rs[0]};
+   $('#lres').innerHTML='<div class="alert '+(bad.length?'bad':'ok')+'">جاهز للاستيراد: <b>'+ok.length+'</b> عميل، هيتوزعوا على <b>'+esc(un(who))+'</b> · مرفوض: <b>'+bad.length+'</b></div>'+(bad.length?'<div class="wrap"><table><tr><th>الصف</th><th>الاسم</th><th>السبب</th></tr>'+bad.slice(0,30).map(function(b){return '<tr><td>'+b.line+'</td><td>'+esc(b.nm)+'</td><td style="white-space:normal">'+esc(b.e)+'</td></tr>'}).join('')+'</table></div><div class="pay"><button class="btn" id="lbad">تنزيل الصفوف المرفوضة</button></div>':'');
+   $('#lgo').disabled=!ok.length;$('#lgo').textContent='استيراد '+ok.length+' عميل';return}
+  if(t.id=='lbad'&&S.lplan)return dl('عملاء-محتملين-مرفوضين.csv',[S.lplan.head.concat(['سبب الرفض']).map(cuQ).join(',')].concat(S.lplan.bad.map(function(b){return b.r.concat([b.e]).map(cuQ).join(',')})).join('\r\n'));
+  if(t.id=='lgo'&&S.lplan&&S.lplan.ok.length){t.disabled=true;var P=S.lplan.ok,done=0,fail=0;
+   for(var i=0;i<P.length;i+=200){var b2=P.slice(i,i+200),xi=await sb.from('leads').insert(b2);if(xi.error){fail+=b2.length;msg(em(xi.error),1)}else done+=b2.length}
+   S.lplan=null;msg('تم استيراد '+done+' عميل'+(fail?' · فشل '+fail:''),fail?1:0);return vLeads()}
+ }
 }
+
 
 /* ---------- الاستعلامات: مراحل مترابطة (مستندات ← زيارة ← ائتمان ← قرار) ---------- */
 var IT={credit:'ائتماني',housing:'سكني',job:'وظيفي'};
