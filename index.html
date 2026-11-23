@@ -649,9 +649,11 @@ async function vInv(){
  var v=$('#v'),role=S.me.role,creator=can('inv.create'),mgr=can('inv.assign'),visitor=can('inv.visit'),allInv=can('inv.view');
  var L=chk(await sb.from('investigations').select('*').order('created_at',{ascending:false}).limit(300)),ids=L.map(function(i){return i.id});
  var DC=[],EV=[];
- if(ids.length){var r=await Promise.all([sb.from('investigation_docs').select('*').in('investigation_id',ids),sb.from('investigation_events').select('*').in('investigation_id',ids).order('at')]);DC=chk(r[0]);EV=chk(r[1])}
+ var DLV={};
+ if(ids.length){var r=await Promise.all([sb.from('investigation_docs').select('*').in('investigation_id',ids),sb.from('investigation_events').select('*').in('investigation_id',ids).order('at'),sb.from('contracts').select('status,customers(national_id)').neq('status','rejected')]);DC=chk(r[0]);EV=chk(r[1]);(r[2].data||[]).forEach(function(c){var ni=c.customers&&c.customers.national_id;if(ni)DLV[ni]=1})}
+ function dlv(i){return i.status=='approved'&&!!DLV[i.national_id]}
  var late=L.filter(function(i){return i.due_date&&i.due_date<today&&ACT.indexOf(i.status)>=0}).length;
- var st={};L.forEach(function(i){st[i.status]=(st[i.status]||0)+1});
+ var st={};L.forEach(function(i){st[i.status]=(st[i.status]||0)+1;if(i.status=='approved'){var k=dlv(i)?'approved_done':'approved_wait';st[k]=(st[k]||0)+1}});
  var open=S.invOpen||{},flt=S.invFlt||'';
  var form=creator?'<div class="card"><h2>طلب استعلام جديد</h2><div class="f"><div><label for="nn">اسم العميل</label><input id="nn"></div><div><label for="nnid">الرقم القومي (14 رقمًا)</label><input id="nnid" inputmode="numeric" maxlength="14"></div><div><label for="nph">الهاتف</label><input id="nph" inputmode="tel"></div><div><label for="nad">العنوان</label><input id="nad"></div>'+(!pickBr()?'':'<div><label for="nb">الفرع</label><select id="nb">'+opts(S.branches,'id','name','','اختر')+'</select></div>')+'<div><label for="nt">النوع</label><select id="nt"><option value="credit">ائتماني</option><option value="housing">سكني</option><option value="job">وظيفي</option></select></div></div><button class="btn am" id="ia" style="margin-top:10px">تسجيل الطلب</button> <span class="hint">بعد التسجيل تُستكمل البيانات والمستندات داخل الطلب.</span>'+
   '<h2 style="margin-top:14px">البحث في تاريخ العميل</h2><div class="pay"><input id="hq" placeholder="الرقم القومي أو الهاتف أو الاسم (3 أحرف على الأقل)"><button class="btn" id="hb">بحث</button></div><div id="hr"></div></div>':'';
@@ -663,7 +665,7 @@ async function vInv(){
   return h}
  function card(i){
   var act=ACT.indexOf(i.status)>=0,lt=act&&i.due_date&&i.due_date<today,op=open[i.id]?' open':'';
-  var h='<details class="card" data-id="'+i.id+'"'+op+'><summary><div class="row"><b>'+esc(i.customer_name)+'</b><span>'+tg(IT[i.inv_type])+' '+tg(IS[i.status],i.status=='approved'?'t0':i.status=='documents'||i.status=='visit'||i.status=='credit_review'?(lt?'t2':'t1'):'t2')+'</span></div>'+stepper(i.status)+'<div class="hint">'+esc(i.customer_phone)+' · '+esc(bn(i.branch_id))+' · أنشأه '+esc(un(i.created_by))+' · '+fd(i.created_at)+(lt?' · <b style="color:var(--rd)">متأخر</b>':'')+'</div></summary>';
+  var h='<details class="card" data-id="'+i.id+'"'+op+'><summary><div class="row"><b>'+esc(i.customer_name)+'</b><span>'+tg(IT[i.inv_type])+' '+(i.status=='approved'?(dlv(i)?tg('تم التسليم','t0')+' ':tg('لم يستلم','t1')+' '):'')+tg(IS[i.status],i.status=='approved'?'t0':i.status=='documents'||i.status=='visit'||i.status=='credit_review'?(lt?'t2':'t1'):'t2')+'</span></div>'+stepper(i.status)+'<div class="hint">'+esc(i.customer_phone)+' · '+esc(bn(i.branch_id))+' · أنشأه '+esc(un(i.created_by))+' · '+fd(i.created_at)+(lt?' · <b style="color:var(--rd)">متأخر</b>':'')+'</div></summary>';
   h+='<div class="hint">رقم قومي: '+esc(i.national_id)+' · العنوان: '+esc(i.customer_address)+'</div>';
   if(i.returned_reason&&act)h+='<div class="alert bad">أُعيد من الائتمان: '+esc(i.returned_reason)+'</div>';
   if(i.status=='cancelled')h+='<div class="alert bad">ملغى: '+esc(i.cancel_reason)+'</div>';
@@ -690,9 +692,9 @@ async function vInv(){
   var ev=EV.filter(function(x){return x.investigation_id==i.id});
   h+='<div class="hint" style="margin-top:8px"><b>سجل الطلب</b><br>'+ev.map(function(x){return fd(x.at)+' '+String(x.at).slice(11,16)+' — '+(x.from_status==x.to_status?'':(x.from_status?IS[x.from_status]+' ← ':'')+IS[x.to_status])+' '+esc(un(x.by_user))+(x.note?' · '+esc(x.note):'')}).join('<br>')+'</div>';
   return h+'</details>'}
- var shown=flt?L.filter(function(i){return i.status==flt}):L;
+ var shown=flt=='approved_done'?L.filter(dlv):flt=='approved_wait'?L.filter(function(i){return i.status=='approved'&&!dlv(i)}):flt?L.filter(function(i){return i.status==flt}):L;
  v.innerHTML='<div class="k"><div><b>'+L.length+'</b><span>إجمالي الطلبات</span></div><div><b>'+(st.documents||0)+'</b><span>مرحلة المستندات</span></div><div><b>'+(st.visit||0)+'</b><span>مرحلة الزيارة</span></div><div><b>'+(st.credit_review||0)+'</b><span>مراجعة الائتمان</span></div><div><b>'+late+'</b><span>متأخرة</span></div></div>'+form+
-  '<div class="card"><label for="fl">تصفية بالمرحلة</label><select id="fl"><option value="">الكل</option>'+Object.keys(IS).map(function(k){return '<option value="'+k+'"'+(k==flt?' selected':'')+'>'+IS[k]+' ('+(st[k]||0)+')</option>'}).join('')+'</select></div>'+(shown.length?shown.map(card).join(''):'<div class="card hint">لا توجد طلبات.</div>');
+  '<div class="card"><label for="fl">تصفية بالمرحلة</label><select id="fl"><option value="">الكل</option>'+Object.keys(IS).map(function(k){var o='<option value="'+k+'"'+(k==flt?' selected':'')+'>'+IS[k]+' ('+(st[k]||0)+')</option>';if(k=='approved')o+=[['approved_done','موافق عليه — تم التسليم'],['approved_wait','موافق عليه — لم يستلم']].map(function(x){return '<option value="'+x[0]+'"'+(x[0]==flt?' selected':'')+'>'+x[1]+' ('+(st[x[0]]||0)+')</option>'}).join('');return o}).join('')+'</select></div>'+(shown.length?shown.map(card).join(''):'<div class="card hint">لا توجد طلبات.</div>');
  v.ontoggle=null;v.querySelectorAll('details.card').forEach(function(d){d.ontoggle=function(){S.invOpen=S.invOpen||{};S.invOpen[d.dataset.id]=d.open}});
  v.onchange=function(e){if(e.target.id=='fl'){S.invFlt=e.target.value;vInv()}};
  var go2=function(a,o,ok){return upd('investigations',a,o,vInv)};
