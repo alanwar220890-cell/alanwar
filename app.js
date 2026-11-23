@@ -102,12 +102,13 @@ function shell(){
  S.nav=Object.keys(NV).filter(function(k){return k=='adm'?S.me.role=='system_admin':(k=='hr'||k=='ai')?true:canAny(NP[k]||[])});
  var nav=S.nav.map(function(k){return [k,NV[k]]});
  var br=S.branches.filter(function(b){return b.id==S.me.branch_id})[0];
- APP.innerHTML='<header><div class="top"><b><img src="logo.png" alt="" onerror="this.style.display=\'none\'"><i></i>ALANWAR AI</b><span><button class="btn sm" id="inst" hidden>تثبيت التطبيق</button> <button class="btn sm nbell" id="nbell" title="الإشعارات" aria-label="الإشعارات">'+BELL+'<b id="nbc" hidden></b></button> <button class="btn sm" id="acc" title="حسابي">'+esc(S.me.full_name)+' · '+RL[S.me.role]+(br?'<span class="hbr"> · '+esc(br.name)+'</span>':'')+'</button> <button class="btn sm" id="lo">خروج</button></span></div><div class="tabs">'+nav.map(function(t){return '<button data-v="'+t[0]+'">'+t[1]+'</button>'}).join('')+'</div></header><main id="v"></main>';
+ var NIC={dash:'chart',cust:'user',con:'note',coll:'cash',leads:'target',inv:'shield',legal:'scale',tgt:'target',task:'task',fin:'chart',camp:'mega',cash:'cash',hr:'clock',ai:'bot',kb:'book',integ:'link',adm:'lock'};S.NV=NV;
+ APP.innerHTML='<div class="lay"><nav class="side" aria-label="القائمة الرئيسية"><div class="brand"><span class="logo">A</span><div><b>الأنوار</b><small>ALANWAR AI</small></div></div><div class="tabs">'+nav.map(function(t){return '<button data-v="'+t[0]+'">'+pico(NIC[t[0]]||'check')+'<span>'+t[1]+'</span></button>'}).join('')+'</div></nav><div class="mainw"><header class="top2"><div><h1 id="vt">'+esc(NV[S.nav[0]]||'')+'</h1><div class="sub">'+esc(S.me.full_name)+' · '+RL[S.me.role]+(br?'<span class="hbr"> · '+esc(br.name)+'</span>':'')+'</div></div><div class="acts"><button class="btn sm" id="inst" hidden>تثبيت التطبيق</button><button class="btn sm nbell" id="nbell" title="الإشعارات" aria-label="الإشعارات">'+BELL+'<b id="nbc" hidden></b></button><button class="btn sm" id="acc" title="حسابي">حسابي</button><button class="btn sm" id="lo">خروج</button></div></header><main id="v"></main></div></div>';
  $('#lo').onclick=out;$('#acc').onclick=accPanel;$('#nbell').onclick=ntPanel;$('#inst').onclick=instApp;if(S.inst)$('#inst').hidden=false;ntLoad();
  if(!S.nav.length)$('#v').innerHTML='<div class="card">لا توجد أقسام متاحة لحسابك حاليًا. اطلب من المدير العام تحديد صلاحياتك.</div>';
  document.querySelectorAll('.tabs button').forEach(function(b){b.onclick=function(){go(b.dataset.v)}})
 }
-function go(v){if(!v)return;S.cur=v;
+function go(v){if(!v)return;S.cur=v;var vt=$('#vt');if(vt&&S.NV)vt.textContent=S.NV[v]||'';try{window.scrollTo(0,0)}catch(e){}
  document.querySelectorAll('.tabs button').forEach(function(b){b.classList.toggle('on',b.dataset.v==v)});
  $('#v').onclick=null;$('#v').onchange=null;$('#v').innerHTML='<p class="hint">جارٍ التحميل…</p>';
  ({dash:vDash,cust:vCust,con:vCon,coll:vColl,adm:vAdm,leads:vLeads,inv:vInv,legal:vLegal,tgt:vTgt,task:vTasks,fin:vFin,camp:vCamp,cash:vCash,hr:vHR,ai:vAI,kb:vKB,integ:vInt})[v]().catch(function(e){$('#v').innerHTML='<div class="card">'+esc(em(e))+'</div>'})
