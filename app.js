@@ -1273,11 +1273,12 @@ async function aiSet(){var w=$('#aiv'),r=await sb.from('app_settings').select('k
   $('#otkc').onclick=function(){var i=$('#otkv');i.select();try{navigator.clipboard.writeText(i.value)}catch(e){document.execCommand('copy')}msg('اتنسخ')}}}
 
 /* ---------- الخزنة ---------- */
+function monthEnd(m){var y=+m.slice(0,4),mo=+m.slice(5,7);return m.slice(0,7)+'-'+String(new Date(Date.UTC(y,mo,0)).getUTCDate()).padStart(2,'0')}
 var CK={sale:['بيع كاش','in'],income:['إيراد آخر','in'],expense:['مصروف','out'],handover:['توريد للإدارة / البنك','out']},CEXP=['إيجار','كهرباء ومياه','مرتبات ومكافآت','نقل ومواصلات','ضيافة','صيانة','أدوات مكتبية','دعاية','أخرى'];
 async function vCash(){
  var v=$('#v'),G=S.cashF=S.cashF||{b:S.me.branch_id||((brList()[0]||{}).id),d:today,m:today.slice(0,7)},vw=canAny(['cash.view','cash.close']),cl=can('cash.close'),en=can('cash.entry');
  if(!G.b&&brList()[0])G.b=brList()[0].id;
- var R=await Promise.all([cuAll(function(){return sb.from('cash_entries').select('*').eq('branch_id',G.b).eq('day',G.d).order('created_at')}),vw?sb.rpc('cash_day',{p_branch:G.b,p_day:G.d}):Promise.resolve({data:null}),vw?sb.from('cash_closings').select('*').eq('branch_id',G.b).gte('day',G.m+'-01').lte('day',G.m+'-31').order('day'):Promise.resolve({data:[]}),vw?cuAll(function(){return sb.from('cash_entries').select('day,kind,amount,profit,voided').eq('branch_id',G.b).gte('day',G.m+'-01').lte('day',G.m+'-31')}):Promise.resolve([])]);
+ var R=await Promise.all([cuAll(function(){return sb.from('cash_entries').select('*').eq('branch_id',G.b).eq('day',G.d).order('created_at')}),vw?sb.rpc('cash_day',{p_branch:G.b,p_day:G.d}):Promise.resolve({data:null}),vw?sb.from('cash_closings').select('*').eq('branch_id',G.b).gte('day',G.m+'-01').lte('day',monthEnd(G.m)).order('day'):Promise.resolve({data:[]}),vw?cuAll(function(){return sb.from('cash_entries').select('day,kind,amount,profit,voided').eq('branch_id',G.b).gte('day',G.m+'-01').lte('day',monthEnd(G.m))}):Promise.resolve([])]);
  var E=R[0],D=(R[1]||{}).data,CL=(R[2]||{}).data||[],ME=R[3]||[],closed=D&&D.closing;
  if(R[1]&&R[1].error){D=null}
  var ms={sale:0,profit:0,income:0,expense:0,handover:0};ME.forEach(function(x){if(x.voided)return;ms[x.kind]+= +x.amount;if(x.kind=='sale')ms.profit+= +(x.profit||0)});
