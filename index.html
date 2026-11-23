@@ -113,6 +113,15 @@ input,select,textarea{border-radius:10px;background:var(--sf)}
  .top2{position:static;padding:10px 14px}.top2 h1{font-size:18px}
  .mainw main{padding:14px 12px 50px}
 }
+
+/* حذف البيانات (مدير النظام) */
+.dxbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0;padding:4px 0;border-bottom:1px dashed #f1c4c6}
+.dxbt .btn{margin-top:4px}
+td.dxc{width:28px;text-align:center}
+#dxbar{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:60;background:#111;color:#fff;padding:10px 14px;border-radius:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;box-shadow:0 8px 28px rgba(0,0,0,.35);max-width:94vw}
+#dxbar .btn:not(.rd){background:#fff;color:#111}
+#dxdlg{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:14px}
+#dxdlg .dxin{max-width:460px;width:100%;margin:0}
 </style>
 </head>
 <body>
@@ -120,6 +129,6 @@ input,select,textarea{border-radius:10px;background:var(--sf)}
 <div class="msg" id="msg" role="status"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=202611240022"></script>
+<script src="app.js?v=202611240043"></script>
 </body>
 </html>
