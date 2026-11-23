@@ -161,6 +161,17 @@ function askPw(title){return new Promise(function(res){
  m.querySelector('#pwno').onclick=function(){done(null)};
  i.onkeydown=function(e){if(e.key=='Enter')m.querySelector('#pwok').click();if(e.key=='Escape')done(null)};
  m.onclick=function(e){if(e.target===m)done(null)}})}
+function viewDoc(path){
+ var m=document.createElement('div');m.className='md';m.style.zIndex=45;
+ m.innerHTML='<div class="card" style="max-width:900px;margin:0 auto"><div class="row"><h2>عرض المستند</h2><span class="pay" style="margin:0"><a class="btn" id="dvo" target="_blank" rel="noopener" style="display:none;text-decoration:none">فتح في صفحة جديدة</a><a class="btn" id="dvd" download style="display:none;text-decoration:none">تحميل</a><button class="btn" id="dvx">إغلاق</button></span></div><div id="dvb" class="hint">جارٍ تحميل المستند…</div></div>';
+ document.body.appendChild(m);var close=function(){m.remove()};m.querySelector('#dvx').onclick=close;m.onclick=function(e){if(e.target===m)close()};
+ sb.storage.from('inv-docs').createSignedUrl(path,3600).then(function(u){
+  var b=m.querySelector('#dvb');if(u.error||!u.data){b.textContent='تعذر فتح المستند: '+em(u.error);return}
+  var url=u.data.signedUrl,pdf=/\.pdf($|\?)/i.test(path);
+  var o=m.querySelector('#dvo'),d=m.querySelector('#dvd');o.href=url;o.style.display='';d.href=url+(url.indexOf('?')>=0?'&':'?')+'download=';d.style.display='';
+  b.className='';b.innerHTML=pdf?'<iframe src="'+esc(url)+'" style="width:100%;height:75vh;border:1px solid var(--ln);border-radius:8px;background:#fff" title="المستند"></iframe>':'<img src="'+esc(url)+'" alt="المستند" style="display:block;max-width:100%;max-height:75vh;margin:0 auto;border-radius:8px">';
+  var im=b.querySelector('img');if(im)im.onerror=function(){b.innerHTML='<p class="hint">الصورة مش راضية تظهر هنا. اضغط «فتح في صفحة جديدة».</p>'}
+ })}
 function accPanel(){
  var old=$('#cm');if(old)old.remove();var m=document.createElement('div');m.id='cm';m.className='md';var br=bn(S.me.branch_id),mine=effPerms(Object.assign({},S.me,{perms:S.me.role=='system_admin'?null:S.perms}));
  m.innerHTML='<div class="card"><div class="row"><h2>حسابي</h2><button class="btn" data-clo="1">إغلاق</button></div><table class="kv"><tr><th>الاسم</th><td>'+esc(S.me.full_name)+'</td></tr><tr><th>الوظيفة</th><td>'+esc(RL[S.me.role])+'</td></tr><tr><th>الفرع</th><td>'+(esc(br)||'—')+'</td></tr><tr><th>البريد (لتسجيل الدخول)</th><td dir="ltr" style="text-align:right">'+esc(S.me.email||'—')+'</td></tr></table><h3>صلاحياتي</h3>'+PG.map(function(g){var l=g.p.filter(function(x){return mine.indexOf(x[0])>=0});return l.length?'<div class="pgx"><b>'+pico(g.ic)+' '+g.t+'</b><div class="pchips">'+l.map(function(x){return '<span class="pchip on">'+pico(x[2])+esc(x[1])+'</span>'}).join('')+'</div></div>':''}).join('')+'</div>';
@@ -492,7 +503,7 @@ async function conPopup(id,after){
  var close=function(){m.remove();if(after)after()};
  m.onclick=async function(e){var t=e.target,a;
   if(t===m||t.getAttribute('data-clo'))return close();
-  if((a=t.getAttribute('data-dopen'))){e.preventDefault();var u=await sb.storage.from('inv-docs').createSignedUrl(a,120);if(u.error)return msg(em(u.error),1);window.open(u.data.signedUrl,'_blank','noopener');return}
+  if((a=t.getAttribute('data-dopen'))){e.preventDefault();viewDoc(a);return}
   if(t.getAttribute('data-prn'))return doPrint('<div class="cfile">'+conFile(d,false).replace(/<a [^>]*>([^<]*)<\/a>/g,'$1')+'</div>');
   if((a=t.getAttribute('data-crm'))){e.preventDefault();if(!confirm('حذف المستند؟'))return;var dx=await sb.from('contract_docs').delete().eq('id',a);if(dx.error)return msg(em(dx.error),1);await sb.storage.from('inv-docs').remove([t.getAttribute('data-crp')]);return conPopup(id,after)}
   if(t.getAttribute('data-cup')){var cf=m.querySelector('#cdf').files[0];if(!cf)return msg('اختر ملفًا',1);if(cf.size>10485760)return msg('الحد الأقصى 10 ميجا',1);
@@ -720,7 +731,7 @@ async function vInv(){
  v.onchange=function(e){if(e.target.id=='fl'){S.invFlt=e.target.value;vInv()}};
  var go2=function(a,o,ok){return upd('investigations',a,o,vInv)};
  v.onclick=async function(e){var t=e.target,a;
-  if((a=t.getAttribute('data-open'))){e.preventDefault();var u=await sb.storage.from('inv-docs').createSignedUrl(a,120);if(u.error)return msg(em(u.error),1);window.open(u.data.signedUrl,'_blank','noopener');return}
+  if((a=t.getAttribute('data-open'))){e.preventDefault();viewDoc(a);return}
   if((a=t.getAttribute('data-rmd'))){e.preventDefault();if(!confirm('حذف المستند؟'))return;var rp=t.getAttribute('data-rmp'),d=await sb.from('investigation_docs').delete().eq('id',a);if(d.error)return msg(em(d.error),1);await sb.storage.from('inv-docs').remove([rp]);return vInv()}
   if((a=t.getAttribute('data-up'))){var f=$('#df'+a).files[0];if(!f)return msg('اختر ملفًا',1);if(f.size>10485760)return msg('الحد الأقصى 10 ميجا',1);
    var inv=L.filter(function(x){return x.id==a})[0],ext=((f.name.match(/\.([a-zA-Z0-9]{1,5})$/)||[])[1]||'bin').toLowerCase(),path=inv.tenant_id+'/'+a+'/'+Date.now()+'_'+Math.random().toString(36).slice(2,8)+'.'+ext;
@@ -791,7 +802,7 @@ async function vLegal(){
   if((a=t.getAttribute('data-ps'))){var x=await sb.from('legal_promises').update({status:t.value}).eq('id',a);if(x.error)return msg(em(x.error),1);msg('تم الحفظ');vLegal()}};
  var rpc=async function(fn,args,ok){var x=await sb.rpc(fn,args);if(x.error)return msg(em(x.error),1);msg(ok||'تم');vLegal()};
  v.onclick=async function(e){var t=e.target,a;
-  if((a=t.getAttribute('data-open'))){e.preventDefault();var u=await sb.storage.from('inv-docs').createSignedUrl(a,120);if(u.error)return msg(em(u.error),1);window.open(u.data.signedUrl,'_blank','noopener');return}
+  if((a=t.getAttribute('data-open'))){e.preventDefault();viewDoc(a);return}
   if((a=t.getAttribute('data-addp'))){var d=$('#pd'+a).value;if(!d)return msg('اختر موعد الاتفاق',1);var am=$('#pa'+a).value,x=await sb.from('legal_promises').insert({case_id:a,promised_date:d,amount:am===''?null:+am,note:$('#pn'+a).value.trim()||null});if(x.error)return msg(em(x.error),1);msg('تم تسجيل الموعد');return vLegal()}
   if((a=t.getAttribute('data-rea')))return rpc('legal_reassign',{p_case:a,p_assignee:$('#ra'+a).value},'تم نقل الملف');
   if((a=t.getAttribute('data-st'))){var s=t.getAttribute('data-s'),nt=$('#en'+a).value.trim();if((s=='settled'||s=='closed')&&!nt)return msg('اكتب ملاحظة الإنهاء',1);if((s=='settled'||s=='closed')&&!confirm('إنهاء الملف القانوني وإعادة العقد للتحصيل؟'))return;return rpc('legal_set_status',{p_case:a,p_status:s,p_note:(s=='settled'||s=='closed')?nt:null})}
