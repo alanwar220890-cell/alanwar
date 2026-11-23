@@ -209,7 +209,8 @@ def main():
     is_demo = '--demo' in sys.argv
     tok = os.environ.get('OPS_TOKEN', '')
     if not is_demo and not tok:
-        sys.exit('OPS_TOKEN مش موجود')
+        print('مفتاح الربط OPS_TOKEN لسه متحطش في GitHub Secrets — مفيش حاجة تتعمل. فعّله من البرنامج: المساعد الذكي ← الإعدادات والربط.')
+        return
     D = demo() if is_demo else rpc('ops_fetch', {'p_token': tok})
     today = D['today']
     plan_date = (datetime.date.fromisoformat(today) + datetime.timedelta(days=1)).isoformat()
