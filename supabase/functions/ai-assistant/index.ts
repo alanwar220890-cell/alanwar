@@ -1,7 +1,7 @@
-// الأنوار — المساعد الذكي (OpenAI)
-// - المفتاح OPENAI_API_KEY بيتحط في Supabase Secrets بس، عمره ما بيوصل للمتصفح.
-// - كل قراءة للبيانات بتتعمل بصلاحيات الموظف نفسه (RLS)، فالمساعد مش هيشوف غير اللي الموظف يقدر يشوفه.
-// - أي تنفيذ (مهمة، متابعة، رسالة) بيرجع كـ«اقتراح» والموظف يأكده من البرنامج.
+// الأنوار — المساعد الذكي (OpenAI أو Google Gemini)
+// - المفاتيح OPENAI_API_KEY / GEMINI_API_KEY بتتحط في Supabase Secrets بس، عمرها ما بتوصل للمتصفح.
+// - كل قراءة للبيانات بتتعمل بصلاحيات الموظف نفسه (RLS).
+// - أي تنفيذ بيرجع كـ«اقتراح» والموظف يأكده من البرنامج.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
@@ -56,7 +56,6 @@ const T: Record<string, Tool> = {
     run: async (a, c) => { let q = c.db.from('ops_plans').select('kind,plan_date,branch_id,user_id,summary,status,data').order('plan_date', { ascending: false }).limit(20); if (a.kind) q = q.eq('kind', a.kind); return (await q).data; } },
   my_tasks: { perms: null, spec: { description: 'مهام الموظف المفتوحة', parameters: { type: 'object', properties: {} } },
     run: async (_a, c) => (await c.db.from('tasks').select('id,title,details,due_date,status').eq('assigned_to', c.me.id).eq('status', 'open').order('due_date').limit(30)).data },
-  // ===== اقتراحات تنفيذ (الموظف بيأكدها من البرنامج)
   propose_task: { perms: ['task.view', 'task.assign'], spec: { description: 'اقتراح مهمة جديدة (الموظف لازم يأكد). لو لموظف تاني لازم صلاحية الإسناد', parameters: { type: 'object', properties: { title: { type: 'string' }, details: { type: 'string' }, assignee_id: { type: 'string' }, due_date: { type: 'string', description: 'YYYY-MM-DD' } }, required: ['title'] } },
     run: async (a, c) => { if (a.assignee_id && a.assignee_id !== c.me.id && !c.perms.includes('task.assign')) return { error: 'مش مسموح تسند مهام لغيرك' }; c.actions.push({ type: 'task', ...a }); return { proposed: true }; } },
   propose_followup: { perms: ['camp.follow', 'camp.manage'], spec: { description: 'اقتراح تسجيل متابعة لعميل منتهي', parameters: { type: 'object', properties: { followup_id: { type: 'string' }, status: { type: 'string', enum: ['contacted', 'interested', 'renewed', 'not_interested'] }, note: { type: 'string' } }, required: ['followup_id', 'note'] } },
@@ -95,12 +94,16 @@ Deno.serve(async (req) => {
     if (!me?.active) return out(403, { error: 'حسابك مش مفعّل' });
     const body = await req.json().catch(() => ({}));
     const mode = body.mode === 'report' ? 'report' : 'chat';
-    const key = Deno.env.get('OPENAI_API_KEY');
-    if (!key) return out(200, { setup: true, reply: 'المساعد الذكي جاهز، بس لسه ربط OpenAI متعملش. المدير العام يحط مفتاح OpenAI في Supabase علشان يشتغل.' });
+    const okey = Deno.env.get('OPENAI_API_KEY'), gkey = Deno.env.get('GEMINI_API_KEY');
+    if (!okey && !gkey) return out(200, { setup: true, reply: 'المساعد الذكي جاهز، بس لسه مفيش ربط بأداة ذكاء اصطناعي. المدير العام يحط مفتاح Gemini (مجاني) أو OpenAI في Supabase علشان يشتغل.' });
     const perms: string[] = (await db.rpc('my_perms')).data || [];
     if (mode === 'report' && !perms.includes('ai.view')) return out(403, { error: 'التقرير التحليلي للإدارة بس' });
     const { data: cfgRow } = await admin.from('app_settings').select('value').eq('tenant_id', me.tenant_id).eq('key', 'ai_config').maybeSingle();
-    const cfg = { model: 'gpt-5.4-mini', monthly_token_limit: 3000000, user_daily_messages: 60, ...(cfgRow?.value || {}) };
+    const cfg0 = cfgRow?.value || {};
+    const provider = cfg0.provider === 'openai' && okey ? 'openai' : cfg0.provider === 'gemini' && gkey ? 'gemini' : (okey ? 'openai' : 'gemini');
+    const key = provider === 'openai' ? okey! : gkey!;
+    const endpoint = provider === 'openai' ? 'https://api.openai.com/v1/chat/completions' : 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+    const cfg = { monthly_token_limit: 3000000, user_daily_messages: 60, ...cfg0, model: (provider === 'openai' ? cfg0.model : cfg0.gemini_model) || (provider === 'openai' ? 'gpt-5.4-mini' : 'gemini-3.8-flash') };
     const m0 = cairoToday().slice(0, 7) + '-01';
     const { data: used } = await admin.from('ai_usage').select('prompt_tokens,completion_tokens,user_id,at').eq('tenant_id', me.tenant_id).gte('at', m0);
     const tot = (used || []).reduce((s: number, x: any) => s + (x.prompt_tokens || 0) + (x.completion_tokens || 0), 0);
@@ -118,10 +121,12 @@ Deno.serve(async (req) => {
     const msgs: any[] = [{ role: 'system', content: sysPrompt(me, perms, br?.name || '', mode) }, ...hist];
     let pt = 0, ct = 0, reply = '';
     for (let i = 0; i < 8; i++) {
-      const r = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: cfg.model, messages: msgs, tools, max_completion_tokens: mode === 'report' ? 6000 : 1800 }) });
-      const j = await r.json();
-      if (!r.ok) return out(200, { error: 'OpenAI: ' + (j?.error?.message || r.status) });
+      const lim = mode === 'report' ? 8000 : 2500;
+      const payload: any = { model: cfg.model, messages: msgs, tools };
+      if (provider === 'openai') payload.max_completion_tokens = lim; else { payload.max_tokens = lim; payload.reasoning_effort = 'low'; }
+      const r = await fetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const j0 = await r.json(); const j = Array.isArray(j0) ? j0[0] : j0;
+      if (!r.ok) return out(200, { error: (provider === 'openai' ? 'OpenAI: ' : 'Gemini: ') + (j?.error?.message || r.status) });
       pt += j.usage?.prompt_tokens || 0; ct += j.usage?.completion_tokens || 0;
       const msg = j.choices?.[0]?.message; if (!msg) break;
       msgs.push(msg);
@@ -133,8 +138,8 @@ Deno.serve(async (req) => {
         msgs.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(res).slice(0, 60000) });
       }
     }
-    await admin.from('ai_usage').insert({ tenant_id: me.tenant_id, user_id: me.id, model: cfg.model, prompt_tokens: pt, completion_tokens: ct });
-    return out(200, { reply: reply || 'مقدرتش أكمل الطلب ده، جرب تسأل بشكل تاني.', actions: ctx.actions, usage: { prompt: pt, completion: ct } });
+    await admin.from('ai_usage').insert({ tenant_id: me.tenant_id, user_id: me.id, model: provider + ':' + cfg.model, prompt_tokens: pt, completion_tokens: ct });
+    return out(200, { reply: reply || 'مقدرتش أكمل الطلب ده، جرب تسأل بشكل تاني.', actions: ctx.actions, usage: { prompt: pt, completion: ct }, provider });
   } catch (e) {
     return out(200, { error: String(e) });
   }
