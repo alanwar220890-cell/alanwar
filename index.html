@@ -109,8 +109,11 @@ function dname(p){var x=p&&p.full_name;return x&&!/@/.test(x)?x:'(بدون اس�
 /* ---------- boot / login ---------- */
 async function boot(){
  if(!window.CFG||!CFG.url||!CFG.key){APP.innerHTML='<div class="card login"><h2>الإعداد ناقص</h2><p class="hint">افتح ملف config.js وضع رابط مشروع Supabase والمفتاح العام (anon).</p></div>';return}
- sb=sb||supabase.createClient(CFG.url,CFG.key);
+ var hs=new URLSearchParams((location.hash||'').replace(/^#/,'')),qs=new URLSearchParams(location.search),rec=hs.get('type')=='recovery'||qs.get('type')=='recovery',herr=hs.get('error_code')||qs.get('error_code');
+ if(!sb){sb=supabase.createClient(CFG.url,CFG.key);sb.auth.onAuthStateChange(function(ev){if(ev=='PASSWORD_RECOVERY')setTimeout(recoverView,0)})}
  var s=await sb.auth.getSession();
+ if(herr){history.replaceState(null,'',location.pathname);if(!s.data.session)return loginView(herr=='otp_expired'?'لينك تغيير كلمة السر انتهت صلاحيته أو اتستخدم قبل كده. اطلب لينك جديد من «نسيت كلمة السر؟».':'اللينك غير صالح. اطلب لينك جديد.')}
+ if(rec&&s.data.session)return recoverView();
  if(!s.data.session)return loginView();
  var p=await sb.from('profiles').select('*').eq('id',s.data.session.user.id).single();
  if(p.error||!p.data)return loginView('تعذر قراءة حسابك');
@@ -140,9 +143,30 @@ function live(){
  if(!live.b){live.b=1;document.addEventListener('visibilitychange',function(){if(!document.hidden)refreshMe()})}
 }
 function loginView(m){
- APP.innerHTML='<div class="card login"><div class="lg"><img src="logo.png" alt="شعار الأنوار" onerror="this.style.display=\'none\'"><div class="lgt">ALANWAR AI</div><div class="hint">نظام الأنوار لإدارة البيع بالتقسيط</div></div><h2 style="text-align:center">تسجيل الدخول</h2>'+(m?'<p class="hint">'+esc(m)+'</p>':'')+'<label for="em">البريد الإلكتروني</label><input id="em" type="email" autocomplete="username"><label for="pw" style="margin-top:8px">كلمة المرور</label><input id="pw" type="password" autocomplete="current-password"><button class="btn am" id="li" style="margin-top:12px;width:100%">دخول</button></div>';
+ APP.innerHTML='<div class="card login"><div class="lg"><img src="logo.png" alt="شعار الأنوار" onerror="this.style.display=\'none\'"><div class="lgt">ALANWAR AI</div><div class="hint">نظام الأنوار لإدارة البيع بالتقسيط</div></div><h2 style="text-align:center">تسجيل الدخول</h2>'+(m?'<p class="hint">'+esc(m)+'</p>':'')+'<label for="em">البريد الإلكتروني</label><input id="em" type="email" autocomplete="username"><label for="pw" style="margin-top:8px">كلمة المرور</label><input id="pw" type="password" autocomplete="current-password"><button class="btn am" id="li" style="margin-top:12px;width:100%">دخول</button><p style="text-align:center;margin:12px 0 0"><a href="#" id="fgt">نسيت كلمة السر؟</a></p></div>';
+ $('#fgt').onclick=function(e){e.preventDefault();forgotView($('#em').value.trim())};
  $('#li').onclick=async function(){var r=await sb.auth.signInWithPassword({email:$('#em').value.trim(),password:$('#pw').value});if(r.error){var m0=String(r.error.message||'');return msg(/fetch|network|failed/i.test(m0)?'تعذر الاتصال بالخادم (الصفحة محجوبة عن Supabase). افتح الموقع من ملف على جهازك أو من رابط GitHub Pages.':'بيانات الدخول غير صحيحة',1)};boot()};
  $('#pw').onkeydown=function(e){if(e.key=='Enter')$('#li').click()}
+}
+function forgotView(em0){
+ APP.innerHTML='<div class="card login"><div class="lg"><img src="logo.png" alt="شعار الأنوار" onerror="this.style.display=\'none\'"><div class="lgt">ALANWAR AI</div></div><h2 style="text-align:center">نسيت كلمة السر</h2><p class="hint">اكتب الإيميل (الجيميل) اللي بتدخل بيه، وهنبعتلك عليه رسالة فيها لينك تعمل منه كلمة سر جديدة.</p><label for="fem">البريد الإلكتروني</label><input id="fem" type="email" autocomplete="username" value="'+esc(em0||'')+'"><button class="btn am" id="fsd" style="margin-top:12px;width:100%">ابعت رسالة التأكيد</button><div id="fres"></div><p style="text-align:center;margin:12px 0 0"><a href="#" id="fbk">رجوع لتسجيل الدخول</a></p></div>';
+ $('#fbk').onclick=function(e){e.preventDefault();loginView()};
+ $('#fem').onkeydown=function(e){if(e.key=='Enter')$('#fsd').click()};
+ $('#fsd').onclick=async function(){var em=$('#fem').value.trim(),b=this;if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em))return msg('اكتب إيميل صحيح',1);
+  b.disabled=true;var r=await sb.auth.resetPasswordForEmail(em,{redirectTo:location.origin+location.pathname});
+  if(r.error){b.disabled=false;var m=String(r.error.message||'');return msg(/rate|seconds|limit/i.test(m)?'طلبت رسايل كتير ورا بعض. استنى شوية وجرب تاني':/fetch|network/i.test(m)?'تعذر الاتصال بالخادم':'مقدرناش نبعت الرسالة: '+m,1)}
+  $('#fres').innerHTML='<div class="alert ok" style="margin-top:10px">لو الإيميل ده مسجل عندنا، هتوصلك رسالة خلال دقايق. افتحها ودوس على اللينك اللي فيها علشان تعمل كلمة سر جديدة.<br><span class="hint">مش لاقيها؟ بص في الـ Spam / الرسائل غير المرغوب فيها.</span></div>';
+  setTimeout(function(){b.disabled=false},60000)}
+}
+function recoverView(){
+ if(S.recShown)return;S.recShown=1;
+ APP.innerHTML='<div class="card login"><div class="lg"><img src="logo.png" alt="شعار الأنوار" onerror="this.style.display=\'none\'"><div class="lgt">ALANWAR AI</div></div><h2 style="text-align:center">كلمة سر جديدة</h2><p class="hint">اكتب كلمة السر الجديدة (8 حروف أو أرقام على الأقل).</p><label for="np1">كلمة السر الجديدة</label><input id="np1" type="password" autocomplete="new-password"><label for="np2" style="margin-top:8px">أكد كلمة السر</label><input id="np2" type="password" autocomplete="new-password"><label style="display:flex;gap:6px;align-items:center;margin-top:8px"><input type="checkbox" id="nps"> إظهار كلمة السر</label><button class="btn am" id="nsv" style="margin-top:12px;width:100%">حفظ كلمة السر</button></div>';
+ $('#nps').onchange=function(){var t=this.checked?'text':'password';$('#np1').type=t;$('#np2').type=t};
+ $('#np2').onkeydown=function(e){if(e.key=='Enter')$('#nsv').click()};
+ $('#nsv').onclick=async function(){var a=$('#np1').value,b2=$('#np2').value;if(a.length<8)return msg('كلمة السر لازم تكون 8 حروف أو أرقام على الأقل',1);if(a!==b2)return msg('كلمتين السر مش زي بعض',1);
+  this.disabled=true;var r=await sb.auth.updateUser({password:a});this.disabled=false;
+  if(r.error){var m=String(r.error.message||'');return msg(/different|same/i.test(m)?'كلمة السر الجديدة لازم تكون مختلفة عن القديمة':/weak|short|characters/i.test(m)?'كلمة السر ضعيفة، خليها أطول وفيها حروف وأرقام':/session|expired|jwt/i.test(m)?'اللينك انتهت صلاحيته. اطلب لينك جديد':'مقدرناش نحفظ: '+m,1)}
+  history.replaceState(null,'',location.pathname);S.recShown=0;msg('تم تغيير كلمة السر بنجاح');boot()}
 }
 async function out(){try{if(S.ch)sb.removeChannel(S.ch)}catch(e){}clearInterval(S.pt);await sb.auth.signOut();S.me=null;boot()}
 function shell(){
