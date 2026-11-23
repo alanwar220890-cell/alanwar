@@ -382,7 +382,8 @@ async function conLoad(id){
  var iv=(r[2].data||[]),inv=iv.filter(function(x){return x.status=='approved'})[0]||iv[0]||null,docs=[];
  if(inv){var dr=await sb.from('investigation_docs').select('doc_type,file_path').eq('investigation_id',inv.id);docs=dr.data||[]}
  var iids=(r[0].data||[]).map(function(x){return x.id}),al=iids.length?((await sb.from('payment_allocations').select('installment_id,amount,paid_at,payments(collector_name,collected_by)').in('installment_id',iids)).data||[]):[];
- return{c:c,ins:r[0].data||[],py:r[1].data||[],inv:inv,docs:docs,al:al}}
+ var cd=(await sb.from('contract_docs').select('id,doc_type,file_path,uploaded_by,created_at').eq('contract_id',id).order('created_at')).data||[];
+ return{c:c,ins:r[0].data||[],py:r[1].data||[],inv:inv,docs:docs,al:al,cdocs:cd}}
 function doPrint(html){var o=$('#pv');if(o)o.remove();o=document.createElement('div');o.id='pv';o.innerHTML=html;document.body.appendChild(o);document.body.classList.add('printing');
  var done=function(){document.body.classList.remove('printing');var p=$('#pv');if(p)p.remove();window.removeEventListener('afterprint',done)};window.addEventListener('afterprint',done);setTimeout(function(){window.print()},150)}
 async function vCon(){
@@ -484,15 +485,21 @@ async function conPopup(id,after){
  var old=$('#cm');if(old)old.remove();
  var m=document.createElement('div');m.id='cm';m.className='md';m.innerHTML='<div class="card hint">جارٍ التحميل…</div>';document.body.appendChild(m);
  var d;try{d=await conLoad(id)}catch(e){m.remove();return msg(em(e),1)}
- var c=d.c,role=S.me.role,canPay=can('coll.pay')&&['active','legal'].indexOf(c.status)>=0,canNote=can('con.notes'),canRc=can('con.receipts'),canCx=can('coll.cancel'),canLg=can('coll.refer')&&c.status=='active',g2=g2Of(d).name,nn=Math.ceil(c.months/3);
+ var c=d.c,role=S.me.role,canPay=can('coll.pay')&&['active','legal'].indexOf(c.status)>=0,canNote=can('con.notes'),canRc=can('con.receipts'),canCx=can('coll.cancel'),canLg=can('coll.refer')&&c.status=='active',canDoc=canAny(['con.create','con.receipts','con.manual']),g2=g2Of(d).name,nn=Math.ceil(c.months/3);
  var due=d.ins.filter(function(x){return x.paid<x.amount&&x.due_date<=today}).reduce(function(s,x){return s+(x.amount-x.paid)},0);
- m.innerHTML='<div class="card"><div class="row"><h2>ملف العقد</h2><span class="pay" style="margin:0"><button class="btn am" data-prn="1">طباعة / حفظ PDF</button>'+(canRc?'<button class="btn" data-rcm="1">إيصالات الأمانة (اختياري)</button>':'')+(canLg?'<button class="btn rd" data-lgm="1">تحويل للشؤون القانونية</button>':'')+'<button class="btn" data-clo="1">إغلاق</button></span></div><div id="rcbox"></div>'+(due>0?'<div class="alert bad">'+ICO_CASH+' المطلوب تحصيله الآن: <b>'+n(due)+'</b> ج.م</div>':'')+'<div class="cfile">'+conFile(d,canPay,canCx)+'</div>'+(canNote?'<label for="kn2" style="margin-top:8px">ملاحظات البيعة</label><textarea id="kn2" rows="3">'+esc(c.sale_notes)+'</textarea><div class="pay"><button class="btn" data-sn="1">حفظ الملاحظات</button></div>':'')+'</div>';
+ m.innerHTML='<div class="card"><div class="row"><h2>ملف العقد</h2><span class="pay" style="margin:0"><button class="btn am" data-prn="1">طباعة / حفظ PDF</button>'+(canRc?'<button class="btn" data-rcm="1">إيصالات الأمانة (اختياري)</button>':'')+(canLg?'<button class="btn rd" data-lgm="1">تحويل للشؤون القانونية</button>':'')+'<button class="btn" data-clo="1">إغلاق</button></span></div><div id="rcbox"></div>'+(due>0?'<div class="alert bad">'+ICO_CASH+' المطلوب تحصيله الآن: <b>'+n(due)+'</b> ج.م</div>':'')+'<div class="cfile">'+conFile(d,canPay,canCx)+'</div><h3>مستندات العقد</h3><div class="hint">'+(d.docs.length?'من الاستعلام: '+d.docs.map(function(x){return '<a href="#" data-dopen="'+esc(x.file_path)+'">'+esc(DT[x.doc_type]||x.doc_type)+'</a>'}).join(' · ')+'<br>':'')+'مرفقة مع العقد: '+(d.cdocs.length?d.cdocs.map(function(x){return '<a href="#" data-dopen="'+esc(x.file_path)+'">'+esc(DT[x.doc_type]||x.doc_type)+'</a>'+(x.uploaded_by==S.me.id||S.me.role=='system_admin'?' <a href="#" data-crm="'+x.id+'" data-crp="'+esc(x.file_path)+'" style="color:var(--rd)">×</a>':'')}).join(' · '):'لا يوجد')+'</div>'+(canDoc?'<div class="pay"><select id="cdt" aria-label="نوع المستند">'+dtOpts(Object.keys(DT).filter(function(k){return k!='visit_photo'}))+'</select><input type="file" id="cdf" accept="image/*,application/pdf" aria-label="الملف"><button class="btn" data-cup="1">رفع مستند</button></div>':'')+(canNote?'<label for="kn2" style="margin-top:8px">ملاحظات البيعة</label><textarea id="kn2" rows="3">'+esc(c.sale_notes)+'</textarea><div class="pay"><button class="btn" data-sn="1">حفظ الملاحظات</button></div>':'')+'</div>';
  m.onchange=function(e){var t=e.target;if(t.id&&t.id.indexOf('ic_')==0){var i=m.querySelector('#in_'+t.id.slice(3));if(i)i.style.display=t.value=='__o'?'':'none'}};
  var close=function(){m.remove();if(after)after()};
  m.onclick=async function(e){var t=e.target,a;
   if(t===m||t.getAttribute('data-clo'))return close();
   if((a=t.getAttribute('data-dopen'))){e.preventDefault();var u=await sb.storage.from('inv-docs').createSignedUrl(a,120);if(u.error)return msg(em(u.error),1);window.open(u.data.signedUrl,'_blank','noopener');return}
   if(t.getAttribute('data-prn'))return doPrint('<div class="cfile">'+conFile(d,false).replace(/<a [^>]*>([^<]*)<\/a>/g,'$1')+'</div>');
+  if((a=t.getAttribute('data-crm'))){e.preventDefault();if(!confirm('حذف المستند؟'))return;var dx=await sb.from('contract_docs').delete().eq('id',a);if(dx.error)return msg(em(dx.error),1);await sb.storage.from('inv-docs').remove([t.getAttribute('data-crp')]);return conPopup(id,after)}
+  if(t.getAttribute('data-cup')){var cf=m.querySelector('#cdf').files[0];if(!cf)return msg('اختر ملفًا',1);if(cf.size>10485760)return msg('الحد الأقصى 10 ميجا',1);
+   var ex=((cf.name.match(/\.([a-zA-Z0-9]{1,5})$/)||[])[1]||'bin').toLowerCase(),cp2=S.me.tenant_id+'/c/'+c.id+'/'+Date.now()+'_'+Math.random().toString(36).slice(2,8)+'.'+ex;
+   t.disabled=true;var u2=await sb.storage.from('inv-docs').upload(cp2,cf,{contentType:cf.type||undefined});if(u2.error){t.disabled=false;return msg(em(u2.error),1)}
+   var i2=await sb.from('contract_docs').insert({contract_id:c.id,doc_type:m.querySelector('#cdt').value,file_path:cp2,file_name:cf.name});t.disabled=false;
+   if(i2.error){await sb.storage.from('inv-docs').remove([cp2]);return msg(em(i2.error),1)}msg('تم رفع المستند');return conPopup(id,after)}
   if(t.getAttribute('data-lgm')){m.querySelector('#rcbox').innerHTML='<div class="alert bad"><b>تحويل البيعة للشؤون القانونية</b><div class="pay"><select id="mlw" aria-label="المسؤول عن القضية">'+opts(legalStaff(c.branch_id),'id',function(p){return p.full_name+' — '+RL[p.role]},'','اختر المسؤول عن القضية')+'</select><input id="mlr" placeholder="سبب التحويل"><button class="btn rd" data-lgo2="1">تأكيد التحويل</button></div><p class="hint">بعد التحويل البيعة بتخرج من التحصيل العادي وتظهر في تصنيف «شؤون قانونية».</p></div>';return}
   if(t.getAttribute('data-lgo2')){var w2=m.querySelector('#mlw').value;if(!w2)return msg('اختر المسؤول عن القضية',1);if(!confirm('تأكيد تحويل البيعة للشؤون القانونية؟'))return;
    t.disabled=true;var lr2=await sb.rpc('legal_refer',{p_contract:c.id,p_assignee:w2,p_reason:m.querySelector('#mlr').value.trim()||null});t.disabled=false;if(lr2.error)return msg(em(lr2.error),1);msg('تم التحويل للشؤون القانونية');return conPopup(id,after)}
@@ -625,7 +632,9 @@ var ACT=['documents','visit','credit_review'];
 var STG=['documents','visit','credit_review','decision'];
 var CD={approve:'موافقة',reject:'رفض'};
 var CR={approve:'موافقة',conditional:'موافقة بشروط',reject:'رفض'};
-var DT={id_front:'بطاقة العميل (وجه)',id_back:'بطاقة العميل (ظهر)',residence_proof:'إثبات السكن',income_proof:'إثبات الدخل',guarantor_id:'بطاقة الضامن الأول',guarantor2_id:'بطاقة الضامن الثاني',visit_photo:'صور الزيارة',other:'أخرى'};
+var DT={id_front:'بطاقة العميل (وجه)',id_back:'بطاقة العميل (ظهر)',guarantor_id:'بطاقة الضامن الأول (وجه)',guarantor_id_back:'بطاقة الضامن الأول (ظهر)',guarantor2_id:'بطاقة الضامن الثاني (وجه)',guarantor2_id_back:'بطاقة الضامن الثاني (ظهر)',residence_proof:'إثبات السكن',income_proof:'إثبات الدخل',marriage_cert:'قسيمة الزواج',birth_cert:'شهادة الميلاد',visit_photo:'صور الزيارة',other:'مستندات أخرى'};
+var DREQ=['id_front','id_back','guarantor_id','guarantor_id_back'];
+function dtOpts(ty){return ty.map(function(k){return '<option value="'+k+'">'+DT[k]+(DREQ.indexOf(k)>=0?' — إلزامي':' — اختياري')+'</option>'}).join('')};
 var REL=['أب','أم','ابن','ابنة','أخ','أخت','زوج','زوجة'];
 var FQ={daily:'يوميًا',weekly:'أسبوعيًا',biweekly:'كل أسبوعين',monthly:'شهريًا',yearly:'سنويًا'};
 function stepper(s){var ix=ACT.indexOf(s),fin=ix<0;
@@ -670,9 +679,10 @@ async function vInv(){
   '<h2 style="margin-top:14px">البحث في تاريخ العميل</h2><div class="pay"><input id="hq" placeholder="الرقم القومي أو الهاتف أو الاسم (3 أحرف على الأقل)"><button class="btn" id="hb">بحث</button></div><div id="hr"></div></div>':'';
  function docs(i){var d=DC.filter(function(x){return x.investigation_id==i.id});
   var canD=creator&&(allInv||i.created_by==S.me.id)&&i.status=='documents'||visitor&&(i.assigned_agent==S.me.id||mgr||role=='system_admin')&&i.status=='visit';
-  var h='<div class="hint" style="margin-top:8px">المستندات: '+(d.length?d.map(function(x){return '<a href="#" data-open="'+esc(x.file_path)+'">'+esc(DT[x.doc_type])+'</a>'+(canD&&x.uploaded_by==S.me.id?' <a href="#" data-rmd="'+x.id+'" data-rmp="'+esc(x.file_path)+'" style="color:var(--rd)">×</a>':'')}).join(' · '):'لا يوجد')+'</div>';
-  if(canD){var ty=i.status=='visit'?['visit_photo','other']:Object.keys(DT).filter(function(k){return k!='visit_photo'});
-   h+='<div class="pay"><select id="dt'+i.id+'" aria-label="نوع المستند">'+ty.map(function(k){return '<option value="'+k+'">'+DT[k]+'</option>'}).join('')+'</select><input type="file" id="df'+i.id+'" accept="image/*,application/pdf" aria-label="الملف"><button class="btn" data-up="'+i.id+'">رفع</button></div>'}
+  var miss=DREQ.filter(function(k){return !d.some(function(x){return x.doc_type==k})});
+  var h='<div class="hint" style="margin-top:8px">المستندات: '+(d.length?d.map(function(x){return '<a href="#" data-open="'+esc(x.file_path)+'">'+esc(DT[x.doc_type])+'</a>'+(canD&&x.uploaded_by==S.me.id?' <a href="#" data-rmd="'+x.id+'" data-rmp="'+esc(x.file_path)+'" style="color:var(--rd)">×</a>':'')}).join(' · '):'لا يوجد')+'</div>'+(i.status=='documents'&&miss.length?'<div class="hint" style="color:var(--rd)">مطلوب قبل الإرسال للزيارة: '+miss.map(function(k){return DT[k]}).join('، ')+'. باقي المستندات اختيارية.</div>':'');
+  if(canD){var ty=i.status=='visit'?Object.keys(DT):Object.keys(DT).filter(function(k){return k!='visit_photo'});
+   h+=(i.status=='visit'?'<div class="hint">تقدر ترفق صور الزيارة وأي مستند ناقص لاستكمال الأوراق.</div>':'')+'<div class="pay"><select id="dt'+i.id+'" aria-label="نوع المستند">'+dtOpts(ty)+'</select><input type="file" id="df'+i.id+'" accept="image/*,application/pdf" aria-label="الملف"><button class="btn" data-up="'+i.id+'">رفع</button></div>'}
   return h}
  function card(i){
   var act=ACT.indexOf(i.status)>=0,lt=act&&i.due_date&&i.due_date<today,op=open[i.id]?' open':'';
