@@ -884,7 +884,8 @@ function appVals(a){var ob=[];($('#a_ob'+a).value||'').split('\n').forEach(funct
  return{customer_name:tx('nm'),customer_phone:tx('ph'),birth_date:tx('bd'),housing:tx('hs'),residence_years:num('ry'),customer_address:tx('ad'),address_details:tx('ads'),occupation_type:tx('oc'),employer_name:tx('en'),employer_address:tx('ea'),job_title:tx('jt'),net_income:num('ni'),income_freq:$('#a_fq'+a).value,new_installment:num('in'),obligations:ob,guarantor1:gV('g1'+a),guarantor2:gV('g2'+a)}}
 async function vInv(){
  var v=$('#v'),role=S.me.role,creator=can('inv.create'),mgr=can('inv.assign'),visitor=can('inv.visit'),allInv=can('inv.view');
- var L=chk(await sb.from('investigations').select('*').order('created_at',{ascending:false}).limit(300)),ids=L.map(function(i){return i.id});
+ var L=chk(await sb.from('investigations').select('*').order('created_at',{ascending:false}).limit(300)),ids=L.map(function(i){return i.id});S.invL=L;
+ S.invRev={};try{((await sb.from('inv_reviews').select('investigation_id,stage,result,created_at').in('investigation_id',ids.slice(0,300)).order('created_at',{ascending:false})).data||[]).forEach(function(r){var o=S.invRev[r.investigation_id]=S.invRev[r.investigation_id]||{};if(!o[r.stage])o[r.stage]=r})}catch(e){}
  var DC=[],EV=[];
  var DLV={};
  if(ids.length){var r=await Promise.all([sb.from('investigation_docs').select('*').in('investigation_id',ids),sb.from('investigation_events').select('*').in('investigation_id',ids).order('at'),sb.from('contracts').select('status,customers(national_id)').neq('status','rejected')]);DC=chk(r[0]);EV=chk(r[1]);(r[2].data||[]).forEach(function(c){var ni=c.customers&&c.customers.national_id;if(ni)DLV[ni]=1})}
@@ -909,6 +910,7 @@ async function vInv(){
   h+='<div class="hint">رقم قومي: '+esc(i.national_id)+' · العنوان: '+esc(i.customer_address)+'</div>';
   if(i.returned_reason&&act)h+='<div class="alert bad">أُعيد من الائتمان: '+esc(i.returned_reason)+'</div>';
   if(i.status=='cancelled')h+='<div class="alert bad">ملغى: '+esc(i.cancel_reason)+'</div>';
+  h+=irBox(i);
   if(i.monthly_income!=null)h+='<div class="k" style="margin-top:8px"><div><b>'+n(i.monthly_income)+'</b><span>الدخل الشهري</span></div><div><b>'+n(i.obligations_monthly)+'</b><span>التزامات خارجية</span></div><div><b>'+n(i.new_installment)+'</b><span>القسط الجديد</span></div><div><b>'+(i.dti==null?'—':i.dti+'%')+'</b><span>نسبة الالتزام من الدخل</span></div></div>';
   if(i.status=='documents'&&creator&&(allInv||i.created_by==S.me.id)){
    h+=appForm(i)+docs(i)+'<div class="pay"><button class="btn" data-sva="'+i.id+'">حفظ البيانات</button><button class="btn am" data-tov="'+i.id+'">اعتماد وإرسال للزيارة الميدانية</button></div>';
@@ -955,14 +957,15 @@ async function vInv(){
   if((a=t.getAttribute('data-rqgo'))){var kp=(v.querySelector('input[name=rqk'+a+']:checked')||{}).value=='1';if(!confirm(kp?'رفع طلب إعادة استعلام بنفس البيانات والضامن؟ هيروح على طول للزيارة الميدانية.':'رفع طلب إعادة استعلام مع تغيير الضامن؟ هيرجع لمرحلة المستندات.'))return;
    t.disabled=true;var xq=await sb.rpc('reinquire',{p_inv:a,p_keep_guarantor:kp,p_note:($('#rqn'+a).value||'').trim()||null});t.disabled=false;if(xq.error)return msg(em(xq.error),1);
    S.reinq=null;S.invOpen=S.invOpen||{};S.invOpen[xq.data]=true;S.invFlt=kp?'visit':'documents';msg(kp?'اتسجل طلب إعادة الاستعلام في مرحلة الزيارة الميدانية':'اتسجل طلب إعادة الاستعلام. اكتب بيانات الضامن الجديد وارفع بطاقته');return vInv()}
-  if((a=t.getAttribute('data-tov'))){var o=appVals(a);o.status='visit';return go2(a,o)}
+  if((a=t.getAttribute('data-irun'))){t.disabled=true;await irRun(a,t.getAttribute('data-irs'));t.disabled=false;return}
+  if((a=t.getAttribute('data-tov'))){var o=appVals(a);o.status='visit';var g1r=go2(a,o);Promise.resolve(g1r).then(function(){irRun(a,'credit',1)});return g1r}
   if((a=t.getAttribute('data-cx'))){var rs=$('#cxr'+a).value.trim();if(!rs)return msg('اكتب سبب الإلغاء',1);if(!confirm('تأكيد إلغاء الطلب؟'))return;return go2(a,{status:'cancelled',cancel_reason:rs})}
   if((a=t.getAttribute('data-asg'))){var ag=$('#ag'+a).value;if(!ag)return msg('اختر المسؤول',1);return go2(a,{assigned_agent:ag,due_date:$('#dd'+a).value||null})}
   if((a=t.getAttribute('data-claim')))return go2(a,{assigned_agent:S.me.id});
   var vis=function(x){var y=$('#vv'+x).value,z=$('#vj'+x).value;var o={field_notes:$('#fn'+x).value.trim()||null,missing_items:$('#mi'+x).value.trim()||null,visit_verified:y===''?null:y=='1',visit_job_verified:z===''?null:z=='1'},vf=vfRead(x);if(vf)o.visit_form=vf;return o};
   if((a=t.getAttribute('data-sv')))return go2(a,vis(a));
   if((a=t.getAttribute('data-vfp'))){var iv=L.filter(function(z){return z.id==a})[0];if(iv)vfPrint(iv);return}
-  if((a=t.getAttribute('data-fin'))){var o2=vis(a);o2.status='credit_review';return go2(a,o2)}
+  if((a=t.getAttribute('data-fin'))){var o2=vis(a);o2.status='credit_review';var g2r=go2(a,o2);Promise.resolve(g2r).then(function(){irRun(a,'visit',1)});return g2r}
   if((a=t.getAttribute('data-loc'))){if(!navigator.geolocation)return msg('المتصفح لا يدعم تحديد الموقع',1);
    return navigator.geolocation.getCurrentPosition(function(p){go2(a,{visit_at:new Date().toISOString(),visit_lat:+p.coords.latitude.toFixed(6),visit_lng:+p.coords.longitude.toFixed(6)})},function(){msg('تعذر تحديد الموقع. اسمح للموقع في المتصفح (يعمل على https أو localhost).',1)},{enableHighAccuracy:true,timeout:15000})}
   if((a=t.getAttribute('data-dec'))){var d2=t.getAttribute('data-d'),rc=$('#cr'+a).value;if(!rc)return msg('اختر التوصية أولًا',1);return go2(a,{credit_recommendation:rc,credit_reasons:$('#cs'+a).value.trim()||null,credit_note:$('#cn'+a).value.trim()||null,status:d2})}
@@ -974,6 +977,31 @@ async function vInv(){
    var ix=await sb.from('investigations').insert({branch_id:bid,customer_name:nm,national_id:ni,customer_phone:$('#nph').value.trim()||null,customer_address:$('#nad').value.trim()||null,inv_type:$('#nt').value});
    if(ix.error)return msg(em(ix.error),1);msg('تم تسجيل الطلب في مرحلة المستندات');vInv()}}
 }
+
+/* ---------- المراجعة الذكية للاستعلامات (فحص + ذكاء اصطناعي + نموذج قرار OR) ---------- */
+var IRD={approve:['قبول','t0'],conditional:['قبول بشروط','t1'],reject:['رفض','t2']};
+function irBox(i){var st=['documents','visit','credit_review','approved','rejected'].indexOf(i.status)>=0;if(!st)return '';var hasVisit=!!(i.visit_form||i.field_notes||i.visit_at);
+ return '<div style="margin-top:8px"><div class="pay"><button class="btn" data-irun="'+i.id+'" data-irs="credit">🔎 مراجعة ذكية — بعد الاستعلام الائتماني</button>'+(hasVisit?'<button class="btn" data-irun="'+i.id+'" data-irs="visit">🔎 مراجعة ذكية — بعد الزيارة الميدانية</button>':'')+'</div><div id="irb'+i.id+'">'+irInner(i)+'</div></div>'}
+function irInner(i){var R=(S.invRev||{})[i.id]||{},st=['documents','visit','credit_review','approved','rejected'].indexOf(i.status)>=0;if(!st)return '';
+ var hasVisit=!!(i.visit_form||i.field_notes||i.visit_at);
+ var one=function(r,ttl){if(!r)return '';var x=r.result||{},ai=x.ai||{},ie=ai.income_estimate||{},d=IRD[x.decision]||['—',''];
+  var L=function(a,c){return a&&a.length?'<div style="margin-top:6px"><b style="font-size:13px">'+c+'</b><ul style="margin:2px 0;padding-right:18px;font-size:13.5px">'+a.map(function(z){return '<li>'+esc(String(z))+'</li>'}).join('')+'</ul></div>':''};
+  return '<div class="card" style="margin:8px 0;border-right:4px solid '+(x.decision=='approve'?'var(--gn)':x.decision=='reject'?'var(--rd)':'var(--am)')+'"><div class="row"><b>'+ttl+'</b><span>'+tg('رأي النظام: '+d[0],d[1])+'</span></div>'+
+   '<div class="k" style="margin:8px 0"><div><b>'+(x.points==null?'—':x.points)+'/100</b><span>نقط الخطر</span></div><div><b>'+(x.pd==null?'—':x.pd+'%')+'</b><span>احتمال التعثر التقديري</span></div><div><b>'+(x.max_installment==null?'—':n(x.max_installment))+'</b><span>أقصى قسط آمن (ج)</span></div><div><b>'+(x.requested_installment==null?'—':n(x.requested_installment))+'</b><span>القسط المطلوب</span></div></div>'+
+   ((x.conditions||[]).length?'<div class="alert"><b>الشروط المقترحة:</b> '+x.conditions.map(esc).join(' · ')+'</div>':'')+
+   (ai.summary?'<div style="white-space:pre-line;margin:6px 0">'+esc(ai.summary)+'</div>':'')+
+   (ie.avg?'<div class="hint">متوسط دخل الوظيفة دي في مصر (تقدير الذكاء الاصطناعي): '+n(ie.min)+' – <b>'+n(ie.avg)+'</b> – '+n(ie.max)+' ج'+(ai.income_plausible?' · الدخل المكتوب: <b>'+esc(ai.income_plausible)+'</b>':'')+(ie.note?'<br>'+esc(ie.note):'')+'</div>':'')+
+   (ai.error?'<div class="hint neg">الذكاء الاصطناعي ما ردش: '+esc(ai.error)+' — القرار اتحسب من الفحوص بس.</div>':ai.skipped?'<div class="hint">'+esc(ai.skipped)+' — القرار اتحسب من الفحوص بس.</div>':'')+
+   L(ai.risk_flags,'نقط الخطر')+L(ai.consistency,'تناقضات ومحتاج تأكيد')+L(ai.positives,'نقط القوة')+L(ai.verify_next,'اتأكد من')+
+   '<details style="margin-top:6px"><summary class="hint">الفحوص الآلية ('+(x.checks||[]).length+')</summary><ul style="margin:4px 0;padding-right:18px;font-size:13px">'+(x.checks||[]).map(function(c){return '<li style="color:'+(c.ok===false?'var(--rd)':'inherit')+'">'+(c.ok===false?'✗ ':'✓ ')+esc(c.t)+(c.pts?' <span class="hint">(+'+c.pts+')</span>':'')+'</li>'}).join('')+'</ul></details>'+
+   '<p class="hint" style="margin:6px 0 0">'+fd(ldate(r.created_at))+' '+hrTime(r.created_at)+(ai.model?' · '+esc(ai.model):'')+(ai.confidence!=null?' · ثقة '+ai.confidence+'%':'')+' · رأي استرشادي، والقرار النهائي للائتمان.</p></div>'};
+ return one(R.credit,'المرحلة 1: بعد الاستعلام الائتماني')+one(R.visit,'المرحلة 2: بعد الزيارة الميدانية')}
+async function irRun(id,stage,silent){var b=$('#irb'+id);if(b&&!silent)b.innerHTML='<p class="hint">بيراجع البيانات… (ممكن ياخد لحد دقيقة)</p>';
+ var x=await sb.functions.invoke('inv-review',{body:{investigation_id:id,stage:stage}}),er=await fnErr(x),d=x.data||{};
+ if(er||d.error){if(!silent)msg(er||d.error,1);return}
+ S.invRev=S.invRev||{};S.invRev[id]=S.invRev[id]||{};S.invRev[id][stage]={result:d,created_at:new Date().toISOString()};
+ var L0=(S.invL||[]).filter(function(z){return z.id==id})[0],bx=$('#irb'+id);if(L0&&bx)bx.innerHTML=irInner(L0)
+ if(!silent)msg('المراجعة الذكية خلصت: '+(IRD[d.decision]||['—'])[0])}
 
 /* ---------- نموذج زيارة الاستعلام ---------- */
 var VFP=[['b','بيانات المشتري'],['g1','بيانات الضامن الأول'],['g2','بيانات الضامن الثاني']],VFR=['ممتاز','جيد','سيئ'];
