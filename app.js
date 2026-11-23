@@ -439,7 +439,7 @@ function conTemplate(){
   ['مثال-1','محمد أحمد علي حسن','29001011234567','01012345678','12 شارع الهرم، الجيزة',(S.branches[0]||{}).name||'','ثلاجة توشيبا 16 قدم','20000','5000','12','1625','','2026-01-15','2026-02-15','16250','خالد أحمد علي','أخ','01111111111','28801011234567','نفس العنوان',''].map(cuQ).join(',')];
  dl('قالب-استيراد-العقود.csv',L.join('\r\n'))}
 async function vCon(){
- var r=await Promise.all([cuAll(function(){return sb.from('contracts').select('*,customers(full_name,phone,national_id,address),products(name)').order('created_at',{ascending:false})}),cuAll(function(){return sb.from('customers').select('id,full_name,phone,customer_code,branch_id,zone_id,housing,national_id,monthly_income,address,id_address').order('full_name')}),sb.from('investigations').select('national_id,guarantor1,guarantor2').eq('status','approved').limit(1000),sb.from('v_delinquency').select('contract_id,days_late,overdue_amount').gt('days_late',0)]);
+ var r=await Promise.all([cuAll(function(){return sb.from('contracts').select('*,customers(full_name,phone,national_id,address),products(name)').order('created_at',{ascending:false})}),cuAll(function(){return sb.from('customers').select('id,full_name,phone,customer_code,branch_id,zone_id,housing,national_id,monthly_income,address,id_address').order('full_name')}),sb.from('investigations').select('national_id,guarantor1,guarantor2,id_data,customer_name,customer_phone,customer_address,address_details,monthly_income,housing').eq('status','approved').order('decided_at',{ascending:true}).limit(1000),sb.from('v_delinquency').select('contract_id,days_late,overdue_amount').gt('days_late',0)]);
  var role=S.me.role,canNew=can('con.create'),adm2=can('con.manual'),v=$('#v'),cu=r[1],K=r[0],AI={},CF=S.ccf=S.ccf||{q:'',st:''};
  (r[2].data||[]).forEach(function(a){AI[a.national_id]=a});
  var DL={};(r[3].data||[]).forEach(function(x){DL[x.contract_id]=x});var canRef=can('coll.refer');
@@ -468,8 +468,9 @@ async function vCon(){
   b.innerHTML=c?'<b>بيانات المشتري</b><table class="kv"><tr><th>الاسم</th><td>'+esc(c.full_name)+'</td></tr><tr><th>الهاتف</th><td>'+(esc(c.phone)||'—')+'</td></tr><tr><th>الرقم القومي</th><td>'+(esc(c.national_id)||'—')+'</td></tr><tr><th>العنوان الفعلي</th><td>'+(esc(c.address)||'—')+'</td></tr></table>':'<b>بيانات المشتري</b><br><span class="hint">اختر العميل لتظهر بياناته</span>';
   var z=$('#kzbox'),need=!!c&&(!c.zone_id||!c.housing);z.style.display=need?'':'none';if(need){$('#kzz').value=c.zone_id||'';$('#khh').value=c.housing||''}
   if(c&&c.customer_code)$('#kcode').value=c.customer_code;
-  $('#kbia').value=c&&c.id_address||'';
-  var a=c&&c.national_id&&AI[c.national_id];if(a&&a.guarantor1&&a.guarantor1.name&&!$('#g1n').value){var g=a.guarantor1;$('#g1n').value=g.name||'';$('#g1r').value=g.relation||'';$('#g1p').value=g.phone||'';$('#g1i').value=g.national_id||''}
+  var a=c&&c.national_id&&AI[c.national_id];$('#kbia').value=c&&c.id_address||(a&&a.id_data&&a.id_data.buyer&&a.id_data.buyer.id_address)||'';
+  var gfill=function(p,g){if(!g||!g.name||$('#'+p+'n').value)return;$('#'+p+'n').value=g.name||'';$('#'+p+'r').value=g.relation||'';$('#'+p+'p').value=g.phone||'';$('#'+p+'i').value=g.national_id||'';if($('#'+p+'a'))$('#'+p+'a').value=g.address||g.id_address||'';if($('#'+p+'ia'))$('#'+p+'ia').value=g.id_address||''};
+  if(a){gfill('g1',a.guarantor1);gfill('g2',a.guarantor2)}
  }
  function sch(){if(!$('#kr'))return;
   var p=+$('#kr').value||0,dd=+$('#kd').value||0,m=+$('#km').value||0,rt=+$('#ka').value||0,mi=$('#kinst')&&$('#kinst').value!==''?+$('#kinst').value:null,o=calcC(p,dd,m,rt,$('#kt').value),inst=mi!=null?mi:(o?Math.round(o.inst*100)/100:0);
@@ -489,7 +490,8 @@ async function vCon(){
   if(t.id=='kp'){var p=S.products.filter(function(x){return x.id==t.value})[0];if(p){$('#ka').value=p.annual_rate;sch()}}
   if(t.id=='kc')setCust(cust())};
  if(S.leadPre&&$('#knc')){var lp0=S.leadPre;S.leadPre=null;$('#knc').style.display='';$('#ncn').value=lp0.name||'';$('#ncp').value=lp0.phone||'';if($('#ncb')&&lp0.branch)$('#ncb').value=lp0.branch;if(lp0.notes&&$('#kn'))$('#kn').value='من العملاء المحتملين: '+lp0.notes;$('#knc').scrollIntoView({behavior:'smooth',block:'center'});msg('كمّل بيانات العميل (الاسم 4 كلمات والرقم القومي) وبعدين بيانات العقد')}
- if(S.conPre&&$('#kc')){var pc=cu.filter(function(x){return x.national_id==S.conPre})[0];S.conPre=null;if(pc){$('#kc').innerHTML=opts([pc],'id',function(x){return x.full_name},pc.id,'');$('#kc').value=pc.id;setCust(pc)}}
+ if(S.conPre&&$('#kc')){var pnid=S.conPre,pc=cu.filter(function(x){return x.national_id==pnid})[0];S.conPre=null;if(pc){$('#kc').innerHTML=opts([pc],'id',function(x){return x.full_name},pc.id,'');$('#kc').value=pc.id;setCust(pc)}
+  else if($('#knc')&&AI[pnid]){var ia=AI[pnid],ib=(ia.id_data||{}).buyer||{};$('#knc').style.display='';$('#ncn').value=ib.name||ia.customer_name||'';$('#ncp').value=ia.customer_phone||'';$('#nci').value=pnid;if($('#nca'))$('#nca').value=[ia.customer_address,ia.address_details].filter(Boolean).join(' — ');if($('#ncm')&&ia.monthly_income!=null)$('#ncm').value=ia.monthly_income;if($('#khh')&&ia.housing)$('#khh').value=ia.housing;$('#kbia').value=ib.id_address||'';var gf2=function(p,g){if(!g||!g.name)return;$('#'+p+'n').value=g.name||'';$('#'+p+'r').value=g.relation||'';$('#'+p+'p').value=g.phone||'';$('#'+p+'i').value=g.national_id||'';if($('#'+p+'a'))$('#'+p+'a').value=g.address||g.id_address||'';if($('#'+p+'ia'))$('#'+p+'ia').value=g.id_address||''};gf2('g1',ia.guarantor1);gf2('g2',ia.guarantor2);$('#knc').scrollIntoView({behavior:'smooth',block:'center'});msg('بيانات العميل والضامن اتملت من الاستعلام والبطاقة — راجعها وكمّل العقد')}}
  async function activate(id,closed){var x=await sb.rpc('contract_activate',{p_contract:id,p_closed:!!closed});if(x.error){msg(em(x.error),1);return false}return true}
  v.onclick=async function(e){var t=e.target,a;
   if((a=t.getAttribute('data-f')))return conPopup(a,vCon);
@@ -880,8 +882,9 @@ function appForm(i){var ob=(i.obligations||[]).map(function(o){return o.label+' 
  '<h2 style="margin-top:12px">الضامن الأول (إلزامي)</h2><div class="f">'+gF('g1'+i.id,i.guarantor1)+'</div>'+
  '<h2 style="margin-top:12px">الضامن الثاني (اختياري)</h2><div class="f">'+gF('g2'+i.id,i.guarantor2)+'</div>'}
 function appVals(a){var ob=[];($('#a_ob'+a).value||'').split('\n').forEach(function(l){l=l.trim();if(!l)return;var p=l.split('|');ob.push({label:(p[0]||'').trim()||'التزام',monthly:+((p[1]||'0').replace(/[^\d.]/g,''))||0})});
+ var cur0=(S.invL||[]).filter(function(z){return z.id==a})[0]||{},gM=function(k,p){var v=gV(p+a);return Object.keys(v).length?Object.assign({},cur0[k]||{},v):{}};
  var num=function(k){var x=$('#a_'+k+a).value;return x===''?null:+x},tx=function(k){return $('#a_'+k+a).value.trim()||null};
- return{customer_name:tx('nm'),customer_phone:tx('ph'),birth_date:tx('bd'),housing:tx('hs'),residence_years:num('ry'),customer_address:tx('ad'),address_details:tx('ads'),occupation_type:tx('oc'),employer_name:tx('en'),employer_address:tx('ea'),job_title:tx('jt'),net_income:num('ni'),income_freq:$('#a_fq'+a).value,new_installment:num('in'),obligations:ob,guarantor1:gV('g1'+a),guarantor2:gV('g2'+a)}}
+ return{customer_name:tx('nm'),customer_phone:tx('ph'),birth_date:tx('bd'),housing:tx('hs'),residence_years:num('ry'),customer_address:tx('ad'),address_details:tx('ads'),occupation_type:tx('oc'),employer_name:tx('en'),employer_address:tx('ea'),job_title:tx('jt'),net_income:num('ni'),income_freq:$('#a_fq'+a).value,new_installment:num('in'),obligations:ob,guarantor1:gM('guarantor1','g1'),guarantor2:gM('guarantor2','g2')}}
 async function vInv(){
  var v=$('#v'),role=S.me.role,creator=can('inv.create'),mgr=can('inv.assign'),visitor=can('inv.visit'),allInv=can('inv.view');
  var L=chk(await sb.from('investigations').select('*').order('created_at',{ascending:false}).limit(300)),ids=L.map(function(i){return i.id});S.invL=L;
@@ -900,7 +903,7 @@ async function vInv(){
  function docs(i){var d=DC.filter(function(x){return x.investigation_id==i.id});
   var canD=creator&&(allInv||i.created_by==S.me.id)&&i.status=='documents'||visitor&&(i.assigned_agent==S.me.id||mgr||role=='system_admin')&&i.status=='visit';
   var miss=DREQ.filter(function(k){return !d.some(function(x){return x.doc_type==k})});
-  var h='<div class="hint" style="margin-top:8px">المستندات: '+(d.length?d.map(function(x){return '<a href="#" data-open="'+esc(x.file_path)+'">'+esc(DT[x.doc_type])+'</a>'+(canD&&x.uploaded_by==S.me.id?' <a href="#" data-rmd="'+x.id+'" data-rmp="'+esc(x.file_path)+'" style="color:var(--rd)">×</a>':'')}).join(' · '):'لا يوجد')+'</div>'+(i.status=='documents'&&miss.length?'<div class="hint" style="color:var(--rd)">مطلوب قبل الإرسال للزيارة: '+miss.map(function(k){return DT[k]}).join('، ')+'. باقي المستندات اختيارية.</div>':'');
+  var h='<div class="hint" style="margin-top:8px">المستندات: '+(d.length?d.map(function(x){return '<a href="#" data-open="'+esc(x.file_path)+'">'+esc(DT[x.doc_type])+'</a>'+(canD&&IDP[x.doc_type]&&(i.status=='documents'||i.inv_type=='verify')&&!/\.pdf$/i.test(x.file_path)?' <a href="#" data-ocr="'+esc(x.file_path)+'" data-oci="'+i.id+'" title="قراءة البيانات من البطاقة">📇</a>':'')+(canD&&x.uploaded_by==S.me.id?' <a href="#" data-rmd="'+x.id+'" data-rmp="'+esc(x.file_path)+'" style="color:var(--rd)">×</a>':'')}).join(' · '):'لا يوجد')+'</div>'+(i.status=='documents'&&miss.length?'<div class="hint" style="color:var(--rd)">مطلوب قبل الإرسال للزيارة: '+miss.map(function(k){return DT[k]}).join('، ')+'. باقي المستندات اختيارية.</div>':'');
   if(canD){var ty=i.status=='visit'?Object.keys(DT):Object.keys(DT).filter(function(k){return k!='visit_photo'});
    h+=(i.status=='visit'?'<div class="hint">تقدر ترفق صور الزيارة وأي مستند ناقص لاستكمال الأوراق.</div>':'')+'<div class="pay"><select id="dt'+i.id+'" aria-label="نوع المستند">'+dtOpts(ty)+'</select><input type="file" id="df'+i.id+'" accept="image/*,application/pdf" aria-label="الملف"><button class="btn" data-up="'+i.id+'">رفع</button></div>'}
   return h}
@@ -913,9 +916,9 @@ async function vInv(){
   h+=irBox(i);
   if(i.monthly_income!=null)h+='<div class="k" style="margin-top:8px"><div><b>'+n(i.monthly_income)+'</b><span>الدخل الشهري</span></div><div><b>'+n(i.obligations_monthly)+'</b><span>التزامات خارجية</span></div><div><b>'+n(i.new_installment)+'</b><span>القسط الجديد</span></div><div><b>'+(i.dti==null?'—':i.dti+'%')+'</b><span>نسبة الالتزام من الدخل</span></div></div>';
   if(i.status=='documents'&&creator&&(allInv||i.created_by==S.me.id)){
-   h+=appForm(i)+docs(i)+'<div class="pay"><button class="btn" data-sva="'+i.id+'">حفظ البيانات</button><button class="btn am" data-tov="'+i.id+'">اعتماد وإرسال للزيارة الميدانية</button></div>';
+   h+=appForm(i)+docs(i)+idBox(i)+'<div class="pay"><button class="btn" data-sva="'+i.id+'">حفظ البيانات</button><button class="btn am" data-tov="'+i.id+'">اعتماد وإرسال للزيارة الميدانية</button></div>';
   }else if(i.status=='documents'){h+='<div class="hint">بانتظار استكمال البيانات والمستندات.</div>'+docs(i)}
-  else{if(i.inv_type=='verify'&&i.status=='visit'&&visitor&&(i.assigned_agent==S.me.id||mgr||role=='system_admin'))h+='<div class="alert"><b>طلب تأكيد بيانات عميل حالي</b><br>راجع بيانات العميل في الزيارة وعدّل أي حاجة اتغيرت (العنوان، الهاتف، السكن، الشغل، الدخل، الضامن). بعد موافقة الائتمان البيانات الجديدة بتتحدث في ملف العميل.</div>'+appForm(i)+'<div class="pay"><button class="btn" data-sva="'+i.id+'">حفظ البيانات المعدلة</button></div>';h+=docs(i)}
+  else{if(i.inv_type=='verify'&&i.status=='visit'&&visitor&&(i.assigned_agent==S.me.id||mgr||role=='system_admin'))h+='<div class="alert"><b>طلب تأكيد بيانات عميل حالي</b><br>راجع بيانات العميل في الزيارة وعدّل أي حاجة اتغيرت (العنوان، الهاتف، السكن، الشغل، الدخل، الضامن). بعد موافقة الائتمان البيانات الجديدة بتتحدث في ملف العميل.</div>'+appForm(i)+idBox(i)+'<div class="pay"><button class="btn" data-sva="'+i.id+'">حفظ البيانات المعدلة</button></div>';h+=docs(i)}
   if(i.status=='visit'){
    if(mgr)h+='<div class="pay"><select id="ag'+i.id+'" aria-label="المسؤول">'+opts(S.profiles.filter(function(p){return p.active&&pcan(p,'inv.visit')}),'id','full_name',i.assigned_agent,'اختر مسؤول الاستعلام')+'</select><input type="date" id="dd'+i.id+'" value="'+(i.due_date||addDays(3))+'" aria-label="الموعد"><button class="btn am" data-asg="'+i.id+'">إسناد</button></div>';
    h+='<div class="hint">المسؤول: '+(i.assigned_agent?esc(un(i.assigned_agent)):'غير مُسند')+' · الموعد: '+fd(i.due_date)+(i.visit_at?' · الزيارة: '+fd(i.visit_at):'')+(i.visit_lat?' · <a href="https://www.openstreetmap.org/?mlat='+i.visit_lat+'&mlon='+i.visit_lng+'#map=17/'+i.visit_lat+'/'+i.visit_lng+'" target="_blank" rel="noopener">الموقع على الخريطة</a>':'')+'</div>';
@@ -949,8 +952,12 @@ async function vInv(){
   if((a=t.getAttribute('data-up'))){var f=$('#df'+a).files[0];if(!f)return msg('اختر ملفًا',1);if(f.size>10485760)return msg('الحد الأقصى 10 ميجا',1);
    var inv=L.filter(function(x){return x.id==a})[0],ext=((f.name.match(/\.([a-zA-Z0-9]{1,5})$/)||[])[1]||'bin').toLowerCase(),path=inv.tenant_id+'/'+a+'/'+Date.now()+'_'+Math.random().toString(36).slice(2,8)+'.'+ext;
    var up=await sb.storage.from('inv-docs').upload(path,f,{contentType:f.type||undefined});if(up.error)return msg(em(up.error),1);
-   var ins=await sb.from('investigation_docs').insert({investigation_id:a,doc_type:$('#dt'+a).value,file_path:path,file_name:f.name});
-   if(ins.error){await sb.storage.from('inv-docs').remove([path]);return msg(em(ins.error),1)}msg('تم رفع المستند');return vInv()}
+   var dty=$('#dt'+a).value,ins=await sb.from('investigation_docs').insert({investigation_id:a,doc_type:dty,file_path:path,file_name:f.name});
+   if(ins.error){await sb.storage.from('inv-docs').remove([path]);return msg(em(ins.error),1)}msg('تم رفع المستند');
+   var ocr=IDP[dty]&&/^image\//.test(f.type||'')&&!!$('#a_nm'+a);S.invOpen=S.invOpen||{};S.invOpen[a]=1;await vInv();if(ocr)idRun(a,path);return}
+  if((a=t.getAttribute('data-ocr'))){e.preventDefault();return idRun(t.getAttribute('data-oci'),a)}
+  if((a=t.getAttribute('data-ocx'))){delete S.idOcr[a][t.getAttribute('data-ocw')];return idPaint(a)}
+  if((a=t.getAttribute('data-oca'))){var ow=t.getAttribute('data-ocw'),oo=idApply(a,ow);if(!oo)return;delete S.idOcr[a][ow];return go2(a,oo)}
   if((a=t.getAttribute('data-mkc'))){var iv0=L.filter(function(x){return x.id==a})[0];S.conPre=iv0&&iv0.national_id;return go('con')}
   if((a=t.getAttribute('data-sva')))return go2(a,appVals(a));
   if((a=t.getAttribute('data-rqo'))){S.reinq=a;var bx=$('#rqb'+a);if(bx)bx.innerHTML=rqBox(a);return}
@@ -977,6 +984,51 @@ async function vInv(){
    var ix=await sb.from('investigations').insert({branch_id:bid,customer_name:nm,national_id:ni,customer_phone:$('#nph').value.trim()||null,customer_address:$('#nad').value.trim()||null,inv_type:$('#nt').value});
    if(ix.error)return msg(em(ix.error),1);msg('تم تسجيل الطلب في مرحلة المستندات');vInv()}}
 }
+
+/* ---------- قراءة البطاقة الشخصية آليًا (وجه/ظهر) للمشتري والضامنين ---------- */
+var IDP={id_front:['buyer','front'],id_back:['buyer','back'],guarantor_id:['g1','front'],guarantor_id_back:['g1','back'],guarantor2_id:['g2','front'],guarantor2_id_back:['g2','back']};
+var IDW={buyer:'المشتري',g1:'الضامن الأول',g2:'الضامن الثاني'};
+var IDF=[['name','الاسم كما في البطاقة'],['national_id','الرقم القومي'],['birth_date','تاريخ الميلاد'],['id_address','عنوان البطاقة'],['job','المهنة'],['marital_status','الحالة الاجتماعية'],['spouse_name','اسم الزوج/الزوجة'],['expiry_date','البطاقة سارية حتى']];
+function idInv(id){return (S.invL||[]).filter(function(z){return z.id==id})[0]}
+function idCur(i,w){return w=='buyer'?{name:i.customer_name,national_id:i.national_id}:(i[w=='g1'?'guarantor1':'guarantor2']||{})}
+function idInner(i){var P=(S.idOcr||{})[i.id]||{},h='';
+ if(P._busy)h+='<div class="alert">📇 بيقرا البطاقة… (ثواني)</div>';
+ ['buyer','g1','g2'].forEach(function(w){var x=P[w];if(!x)return;var cur=idCur(i,w),wr=(x.warnings||[]).slice();
+  if(x.national_id&&cur.national_id&&x.national_id!=cur.national_id)wr.push('الرقم القومي في البطاقة ('+x.national_id+') مختلف عن المسجل ('+cur.national_id+') — اتأكد إن دي بطاقة '+IDW[w]+'. لو اعتمدت هيتعدل للي في البطاقة.');
+  if(x.age!=null&&w=='buyer'&&(x.age<21||x.age>60))wr.push('السن من الرقم القومي '+x.age+' سنة — خارج حدود الاستعلام (21–60)');
+  h+='<div class="card" style="margin:8px 0;border-right:4px solid var(--am)"><div class="row"><b>📇 بيانات بطاقة '+IDW[w]+' (مقروءة آليًا — راجعها وعدّل لو فيه غلط)</b><span class="hint">'+(x.sides||[]).map(function(s){return s=='front'?'الوش':s=='back'?'الضهر':''}).join(' + ')+'</span></div>'+
+   (wr.length?'<div class="alert bad">'+wr.map(esc).join('<br>')+'</div>':'')+
+   '<div class="f">'+IDF.map(function(f){var k=f[0],v=x[k]==null?'':x[k],tp=/date/.test(k)?' type="date"':k=='national_id'?' inputmode="numeric" maxlength="14"':'';
+    return '<div><label for="oc_'+k+'_'+w+i.id+'">'+f[1]+'</label>'+(k=='id_address'?'<textarea id="oc_'+k+'_'+w+i.id+'" rows="2">'+esc(v)+'</textarea>':'<input id="oc_'+k+'_'+w+i.id+'"'+tp+' value="'+esc(v)+'">')+'</div>'}).join('')+'</div>'+
+   ((x.birth_gov||x.nid_gender)?'<p class="hint">من الرقم القومي: '+[x.nid_gender,x.age!=null?x.age+' سنة':'',x.birth_gov?'مواليد '+x.birth_gov:''].filter(Boolean).map(esc).join(' · ')+'</p>':'')+
+   (x.notes?'<p class="hint">ملاحظة القراءة: '+esc(x.notes)+'</p>':'')+
+   '<div class="pay"><button class="btn am" data-oca="'+i.id+'" data-ocw="'+w+'">اعتماد وتعبئة الاستعلام</button><button class="btn" data-ocx="'+i.id+'" data-ocw="'+w+'">تجاهل</button></div></div>'});
+ var D=i.id_data||{},sv=['buyer','g1','g2'].filter(function(w){return D[w]&&!P[w]});
+ if(sv.length)h+='<p class="hint">📇 بيانات بطاقات معتمدة: '+sv.map(function(w){var x=D[w];return IDW[w]+' ('+esc(x.name||'')+(x.expiry_date?' · سارية حتى '+esc(x.expiry_date):'')+')'}).join(' · ')+'</p>';
+ return h}
+function idBox(i){return '<div id="idb'+i.id+'">'+idInner(i)+'</div>'}
+function idPaint(id){var i=idInv(id),b=$('#idb'+id);if(i&&b)b.innerHTML=idInner(i)}
+async function idRun(id,path){S.idOcr=S.idOcr||{};var P=S.idOcr[id]=S.idOcr[id]||{};P._busy=1;idPaint(id);
+ var x=await sb.functions.invoke('id-ocr',{body:{path:path}}),er=await fnErr(x),d=x.data||{};P._busy=0;
+ if(er||d.error){idPaint(id);return msg(er||d.error,1)}
+ var w=(IDP[d.doc_type]||[])[0];if(!w){idPaint(id);return}
+ var o=P[w]||{sides:[],warnings:[]};d.id_address=d.address;
+ ['name','national_id','birth_date','id_address','job','marital_status','spouse_name','expiry_date','age','birth_gov','nid_gender','gender','religion','issue_date','workplace'].forEach(function(k){if(d[k]!=null&&d[k]!==''&&(o[k]==null||o[k]===''||k=='national_id'&&String(d[k]).length==14))o[k]=d[k]});
+ if(o.sides.indexOf(d.side)<0)o.sides.push(d.side);o.warnings=o.warnings.concat(d.warnings||[]).filter(function(v,ix,a){return a.indexOf(v)==ix});
+ if(d.notes)o.notes=(o.notes?o.notes+' · ':'')+d.notes;o.model=d.model;P[w]=o;idPaint(id);
+ var bx=$('#idb'+id);if(bx)bx.scrollIntoView({behavior:'smooth',block:'center'});msg('اتقرت بيانات بطاقة '+IDW[w]+' — راجعها واعتمد')}
+function idApply(id,w){var i=idInv(id);if(!i)return null;var g=function(k){var e=$('#oc_'+k+'_'+w+id);return e?(e.value||'').trim():''};
+ var P={};IDF.forEach(function(f){var v=g(f[0]);if(f[0]=='national_id')v=cuDig(v).replace(/\D/g,'');P[f[0]]=v||null});
+ if(P.national_id&&!/^[0-9]{14}$/.test(P.national_id)){msg('الرقم القومي لازم 14 رقم',1);return null}
+ var x=((S.idOcr||{})[id]||{})[w]||{};['gender','religion','birth_gov','issue_date','workplace'].forEach(function(k){if(x[k])P[k]=x[k]});P.read_at=new Date().toISOString();
+ var set=function(sel,v,force){var e=$(sel);if(e&&v&&(force||!e.value))e.value=v};
+ if(w=='buyer'){set('#a_nm'+id,P.name,1);set('#a_bd'+id,P.birth_date,1);set('#a_ad'+id,P.id_address);set('#a_jt'+id,P.job)}
+ else{set('#'+w+id+'n',P.name,1);set('#'+w+id+'i',P.national_id,1)}
+ if(!$('#a_nm'+id)){msg('افتح نموذج بيانات الطلب الأول',1);return null}
+ var o=appVals(id);o.id_data=Object.assign({},i.id_data||{});o.id_data[w]=P;
+ if(w=='buyer'){if(P.national_id&&P.national_id!=i.national_id)o.national_id=P.national_id}
+ else{var gk=w=='g1'?'guarantor1':'guarantor2';o[gk]=Object.assign({},o[gk]||{},{name:P.name||(o[gk]||{}).name,national_id:P.national_id||(o[gk]||{}).national_id,id_address:P.id_address,birth_date:P.birth_date,job:P.job,marital_status:P.marital_status});if(!o[gk].address&&P.id_address)o[gk].address=P.id_address}
+ return o}
 
 /* ---------- المراجعة الذكية للاستعلامات (فحص + ذكاء اصطناعي + نموذج قرار OR) ---------- */
 var IRD={approve:['قبول','t0'],conditional:['قبول بشروط','t1'],reject:['رفض','t2']};
@@ -1007,9 +1059,9 @@ async function irRun(id,stage,silent){var b=$('#irb'+id);if(b&&!silent)b.innerHT
 var VFP=[['b','بيانات المشتري'],['g1','بيانات الضامن الأول'],['g2','بيانات الضامن الثاني']],VFR=['ممتاز','جيد','سيئ'];
 var VFF=[['name','الاسم بالكامل','t'],['phones','أرقام التليفونات','t'],['landline','رقم التليفون الأرضي','t'],['job','الوظيفة','t'],['reputation','سمعة العميل بالمنطقة','r'],['employer','اسم جهة العمل','t'],['work_address','عنوان العمل','t'],['assets','هل يوجد أي أملاك أو ودائع بنكية','t'],['income','متوسط الدخل الشهري','n'],['marital','الحالة الاجتماعية','m'],['children','عدد الأولاد','n'],['car','موديل السيارة إن وجدت + رقم السيارة','t'],['outside','التقسيط من الخارج: هل سبق مطالبتهم بدين في المنطقة','y'],['outside_details','تفاصيل التقسيط من الخارج','t'],['rating','تقييمك لحالة العميل','r'],['address','العنوان بالتفصيل','a']];
 var VF_NOTICE='في حالة قبول الشركة للاستعلام ورفض العميل إتمام إجراءات التسليم في خلال 21 يوم من تاريخ الاستعلام لا يكون له الحق في استرداد الرسوم ويكون للشركة الحق في إلغاء الاستعلام وإعادة الإجراءات مرة أخرى برسوم جديدة لإتمام التعامل وسيتم انتظار مكالمة من الشركة قبل الحضور.';
-function vfData(i){var f=JSON.parse(JSON.stringify(i.visit_form||{})),g1=i.guarantor1||{},g2=i.guarantor2||{};
- f.b=Object.assign({name:i.customer_name,phones:i.customer_phone,job:i.job_title,employer:i.employer_name,work_address:i.employer_address,income:i.monthly_income||i.net_income,address:i.address_details||i.customer_address},f.b||{});
- f.g1=Object.assign({name:g1.name,phones:g1.phone,address:g1.address},f.g1||{});f.g2=Object.assign({name:g2.name,phones:g2.phone,address:g2.address},f.g2||{});
+function vfData(i){var f=JSON.parse(JSON.stringify(i.visit_form||{})),g1=i.guarantor1||{},g2=i.guarantor2||{},ID=i.id_data||{},Ib=ID.buyer||{},I1=ID.g1||{},I2=ID.g2||{};
+ f.b=Object.assign({name:i.customer_name,phones:i.customer_phone,marital:Ib.marital_status,job:i.job_title||Ib.job,employer:i.employer_name,work_address:i.employer_address,income:i.monthly_income||i.net_income,address:i.address_details||i.customer_address},f.b||{});
+ f.g1=Object.assign({name:g1.name,phones:g1.phone,address:g1.address||g1.id_address,job:g1.job||I1.job,marital:g1.marital_status||I1.marital_status},f.g1||{});f.g2=Object.assign({name:g2.name,phones:g2.phone,address:g2.address||g2.id_address,job:g2.job||I2.job,marital:g2.marital_status||I2.marital_status},f.g2||{});
  f.rel=f.rel||[{},{},{}];while(f.rel.length<3)f.rel.push({});return f}
 function vfForm(i){var f=vfData(i),id=i.id,inp=function(p,k,t){var v=(f[p]||{})[k];v=v==null?'':v;
   if(t=='r')return '<select data-vf="'+p+'.'+k+'"><option value="">—</option>'+VFR.map(function(x){return '<option'+(v==x?' selected':'')+'>'+x+'</option>'}).join('')+'</select>';
