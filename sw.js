@@ -1,12 +1,16 @@
 // الأنوار — Service Worker: بيخلي البرنامج يتثبت كتطبيق ويفتح أسرع.
 // البيانات نفسها (Supabase) مش بتتخزن، بتيجي دايمًا من السيرفر.
-const C = 'alanwar-v6';
-const CORE = ['./', 'index.html', 'app.js', 'config.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'logo.png', 'mark.png'];
+const C = 'alanwar-v7';
+const CORE = ['./', 'index.html', 'config.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'logo.png', 'mark.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(C).then(c => c.addAll(CORE)).catch(() => {})); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== C).map(x => caches.delete(x))))); self.clients.claim(); });
 self.addEventListener('fetch', e => {
   const r = e.request, u = new URL(r.url);
-  if (r.method !== 'GET' || u.origin !== location.origin) return;
+  if (r.method !== 'GET') return;
+  // ملفات ثابتة متغيرش (app.js?v=… ومكتبة Supabase والخطوط والصور): من الجهاز على طول من غير ما نستنى النت
+  const fixed = (u.origin === location.origin && (/[?&]v=\d+/.test(u.search) || /\.(png|jpg|svg|webp|woff2?)$/.test(u.pathname))) || /cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@[\d.]+\//.test(r.url) || /fonts\.(gstatic|googleapis)\.com/.test(u.host);
+  if (fixed) { e.respondWith(caches.open(C).then(c => c.match(r).then(m => m || fetch(r).then(res => { if (res.ok || res.type === 'opaque') { c.put(r, res.clone()); if (/app\.js$/.test(u.pathname)) c.keys().then(ks => ks.forEach(k => { const ku = new URL(k.url); if (/app\.js$/.test(ku.pathname) && ku.search !== u.search) c.delete(k); })); } return res; })))); return; }
+  if (u.origin !== location.origin) return;
   // الشبكة الأول علشان أي تحديث يوصل على طول، والنسخة المحفوظة لو النت قاطع
   e.respondWith(fetch(r, { cache: 'no-cache' }).then(res => { if (res.ok) { const cp = res.clone(); caches.open(C).then(c => c.put(r, cp)); } return res; })
     .catch(() => caches.match(r, { ignoreSearch: true }).then(m => m || caches.match('index.html'))));
