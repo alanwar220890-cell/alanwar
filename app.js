@@ -537,6 +537,16 @@ function kMapUI(rs,ix,miss){var hd=rs[0],sm=rs[1]||[];
  var op=function(k){return '<option value="">— مش موجود في الشيت —</option>'+hd.map(function(h,q){return '<option value="'+q+'"'+(ix[k]===q?' selected':'')+'>'+esc((h||'عمود '+(q+1))+(sm[q]?' ← مثال: '+String(sm[q]).slice(0,25):''))+'</option>'}).join('')};
  return '<details class="card" id="kmapc"'+(miss?' open':'')+' style="margin-top:8px"><summary><b>🔗 ربط أعمدة الشيت بخانات البرنامج</b>'+(miss?' <span class="neg">(ناقص: '+esc(miss)+')</span>':' <span class="hint">(اتربطت لوحدها — راجعها لو الشيت من برنامج تاني)</span>')+'</summary><p class="hint">لو الشيت متصدّر من برنامج تاني بأسماء أعمدة مختلفة: اختار قصاد كل خانة العمود اللي فيه البيانات دي. الربط بيتحفظ، والمرة الجاية أي شيت بنفس الأعمدة بيتربط لوحده. «المتبقي» أو «عدد الأقساط المدفوعة» بيتحسب منهم المسدد لو مفيش عمود مسدد. «إجمالي الأقساط» بيتحسب منه القسط أو السعر لو ناقصين.</p><div class="f">'+
   KCOLS.map(function(m){return '<div><label for="km_'+m[0]+'">'+esc(m[1])+(KREQ[m[0]]?' *':'')+'</label><select id="km_'+m[0]+'" data-km="'+m[0]+'">'+op(m[0])+'</select></div>'}).join('')+'</div><div class="pay"><button class="btn am" id="kmapgo">فحص بالربط ده</button><button class="btn sm" id="kmapreset">رجّع الربط التلقائي</button></div></details>'}
+
+// ===== ربط القيم: أسماء/أكواد الموظفين والفروع في الشيت القديم ← الموظفين والفروع عندنا
+function kvGet(){var v={};try{v=JSON.parse(localStorage.getItem('kvmap')||'{}')}catch(e){}v.emp=v.emp||{};v.br=v.br||{};return v}
+function kvUI(UE,UB){if(!UE.length&&!UB.length)return '';var st=staffList(),bl=brList();
+ var row=function(k,v,opt){return '<tr><td><b>'+esc(v)+'</b></td><td><select data-kv="'+k+'" data-kvv="'+esc(cuNorm(v))+'">'+opt+'</select></td></tr>'};
+ var oe='<option value="">— اختار الموظف —</option><option value="_skip">سيبها فاضية (من غير موظف)</option>'+st.map(function(p){return '<option value="'+p.id+'">'+esc(p.full_name+' — '+(RL[p.role]||''))+'</option>'}).join('');
+ var ob='<option value="">— اختار الفرع —</option><option value="_def">الفرع الافتراضي اللي تحت</option>'+bl.map(function(b){return '<option value="'+b.id+'">'+esc(b.name)+'</option>'}).join('');
+ return '<div class="card" style="margin-top:8px;border:2px solid var(--am)"><h3 style="margin-top:0">🔁 ربط القيم اللي مش معروفة</h3><p class="hint">الشيت فيه أسماء أو أكواد موظفين وفروع من البرنامج القديم. قصاد كل واحدة اختار مين هي عندنا، والربط بيتحفظ للمرات الجاية.</p><div class="wrap"><table><tr><th>القيمة في الشيت</th><th>عندنا</th></tr>'+
+  (UE.length?'<tr><th colspan="2">الموظفين ('+UE.length+')</th></tr>'+UE.map(function(v){return row('emp',v,oe)}).join(''):'')+(UB.length?'<tr><th colspan="2">الفروع ('+UB.length+')</th></tr>'+UB.map(function(v){return row('br',v,ob)}).join(''):'')+
+  '</table></div><div class="pay"><button class="btn am" id="kvgo">طبّق الربط وافحص تاني</button></div></div>'}
 function conTemplate(){var b0=(brList()[0]||{}).name||'',e0=xlStaff()[0]||'',p0=(S.products||[])[0],T=function(i){return {w:i,text:true}};
  dlx('قالب-استيراد-العقود.xlsx',XL.template({head:KT,
   cols:[T(14),{w:28},T(18),T(15),{w:32},{w:28},{w:16},{w:14},{w:12},{w:12},{w:20},{w:22},{w:24},{w:24},{w:12},{w:11},{w:11},{w:11},{w:13},T(13),T(13),{w:14},{w:24},{w:13},T(15),T(18),{w:28},{w:28},{w:24},{w:16},T(15),T(18),{w:28},{w:30}],
@@ -609,6 +619,7 @@ async function vCon(){
    var head=KHEAD.concat(['إجمالي الأقساط','المتبقي','الحالة']);
    var rows=EL.map(function(c){var cu0=c.customers||{},g=c.guarantor||{},pd=Math.round((PD[c.id]||0)*100)/100;return [c.code||'',cu0.full_name||'',cu0.national_id||'',cu0.phone||'',cu0.address||'',bn(c.branch_id),c.product_name||(c.products&&c.products.name)||'',c.price,c.down_payment,c.months,c.installment,c.annual_rate,c.start_date||'',c.first_due_date||'',pd,g.name||'',g.relation||'',g.phone||'',g.national_id||'',g.address||'',c.sale_notes||'',c.total,Math.round((c.total-pd)*100)/100,ST[c.status]||c.status]});
    dl('العقود-'+today+'.csv',[head.map(cuQ).join(',')].concat(rows.map(function(r){return r.map(function(x){return cuQ(String(x==null?'':x).replace(/[\t\r\n]+/g,' '))}).join(',')})).join('\r\n'))}finally{t.disabled=false}return}
+  if(t.id=='kvgo'){var V=kvGet();document.querySelectorAll('[data-kv]').forEach(function(sl){if(sl.value)V[sl.getAttribute('data-kv')][sl.getAttribute('data-kvv')]=sl.value});try{localStorage.setItem('kvmap',JSON.stringify(V))}catch(_){}t={id:'kchk'}}
   if(t.id=='kmapgo'||t.id=='kmapreset'){var rs0=cuParse($('#kpaste').value),A0=kAuto(rs0),sg=kSig(A0.rs[0]);
    if(t.id=='kmapreset'){try{localStorage.removeItem('kmap:'+sg)}catch(_){}S.kmapOver=null}
    else{var ov={};document.querySelectorAll('[data-km]').forEach(function(sl){if(sl.value!=='')ov[sl.getAttribute('data-km')]=+sl.value});S.kmapOver={sig:sg,ix:ov};try{localStorage.setItem('kmap:'+sg,JSON.stringify(ov))}catch(_){}}
@@ -618,7 +629,7 @@ async function vCon(){
    var ms=[];if(ix.price==null&&ix.tot==null)ms.push('سعر المنتج');if(ix.months==null)ms.push('المدة');if(ix.sd==null&&ix.fdd==null)ms.push('تاريخ العقد (أو تاريخ أول قسط)');if(ix.nid==null&&ix.code==null&&ix.name==null)ms.push('الرقم القومي أو الكود أو الاسم');
    mb.innerHTML=kMapUI(rs,ix,ms.join('، '));
    if(ms.length){$('#kres').innerHTML='<div class="alert bad">مش لاقي أعمدة: '+esc(ms.join('، '))+'. اربطهم من «ربط أعمدة الشيت» فوق ودوس «فحص بالربط ده».</div>';$('#kgo').disabled=true;mb.scrollIntoView({behavior:'smooth',block:'start'});return}
-   var EMP=xlEmpMap(),zmap={},pmap={},bmap={},byN={},byC={},ok=[],bad=[],seen={},newC=0,defB=($('#kib')&&$('#kib').value)||S.me.branch_id;S.branches.forEach(function(b){bmap[cuNorm(b.name)]=b.id});(S.zones||[]).forEach(function(z){zmap[cuNorm(z.name)]=z.id});(S.products||[]).forEach(function(x){pmap[cuNorm(x.name)]=x});cu.forEach(function(c){if(c.national_id)byN[c.national_id]=c;if(c.customer_code)byC[c.customer_code]=c});
+   var VM=kvGet(),UB={},UE={},EMP=xlEmpMap(),zmap={},pmap={},bmap={},byN={},byC={},ok=[],bad=[],seen={},newC=0,defB=($('#kib')&&$('#kib').value)||S.me.branch_id;S.branches.forEach(function(b){bmap[cuNorm(b.name)]=b.id});(S.zones||[]).forEach(function(z){zmap[cuNorm(z.name)]=z.id});(S.products||[]).forEach(function(x){pmap[cuNorm(x.name)]=x});cu.forEach(function(c){if(c.national_id)byN[c.national_id]=c;if(c.customer_code)byC[c.customer_code]=c});
    rs.slice(1).forEach(function(r,k){var g=function(key){return ix[key]==null?'':String(r[ix[key]]==null?'':r[ix[key]]).trim()},er=[];
     var ni=cuDig(g('nid')).replace(/[^0-9]/g,''),ph=cuDig(g('phone')).replace(/[^0-9]/g,''),code=g('code');if(/^1[0-9]{9}$/.test(ph))ph='0'+ph;
     var o={national_id:ni||null,customer_code:code||null,full_name:g('name').replace(/\s+/g,' ')||null,phone:ph||null,address:g('addr')||null,product_name:g('prod')||null,
@@ -628,7 +639,7 @@ async function vCon(){
     var zz=g('zone');if(zz)o.zone_id=zmap[cuNorm(zz)]||null;var hh=cuNorm(g('hs'));if(hh){if(/تمليك/.test(hh))o.housing='owned';else if(/جديد/.test(hh))o.housing='new_rent';else if(/ايجار/.test(hh))o.housing='old_rent';else er.push('نوع السكن غير معروف')}
     var mk0=cuNorm(g('mk'));if(mk0)o.marketing_consent=/^(نعم|yes|1|true|موافق)$/i.test(mk0);
     var pr0=o.product_name&&pmap[cuNorm(o.product_name)];if(pr0){o.product_id=pr0.id;o.product_name=pr0.name;if(!g('rate'))o.annual_rate=+pr0.annual_rate||0}
-    [['seller','seller_id','موظف المبيعات'],['emp','assigned_to','الموظف المسؤول']].forEach(function(f){var v0=g(f[0]);if(!v0)return;var id0=EMP.get(v0);if(id0=='dup')er.push('اسم '+f[2]+' متكرر');else if(!id0)er.push(f[2]+' «'+v0+'» مش موجود');else o[f[1]]=id0});
+    [['seller','seller_id','موظف المبيعات'],['emp','assigned_to','الموظف المسؤول']].forEach(function(f){var v0=g(f[0]);if(!v0)return;var id0=EMP.get(v0),mv=VM.emp[cuNorm(v0)];if(!id0||id0=='dup'){if(mv=='_skip')return;if(mv){o[f[1]]=mv;return}UE[v0]=1;er.push(f[2]+' «'+v0+'» مش معروف — اربطه في «ربط القيم» فوق')}else o[f[1]]=id0});
     if(o.g2_nid&&!/^[0-9]{14}$/.test(o.g2_nid))er.push('الرقم القومي للضامن الثاني لازم 14 رقم');
     var tot0=kNum(g('tot')),rem0=kNum(g('remain')),pn0=kNum(g('paidn'));
     if(!g('sd')&&o.first_due_date){var dd=new Date(o.first_due_date+'T00:00:00Z');dd.setUTCMonth(dd.getUTCMonth()-1);o.start_date=dd.toISOString().slice(0,10)}
@@ -636,7 +647,7 @@ async function vCon(){
     if(o.price==null&&o.months&&(o.installment||tot0)){o.price=Math.round(((o.installment||0)*o.months||tot0)+(o.down_payment||0));if(!g('rate'))o.annual_rate=0}
     if(!g('paid')){var ti=(o.installment||0)*(o.months||0)||tot0||0;if(rem0!=null&&ti)o.paid_amount=Math.max(0,Math.round((ti-rem0)*100)/100);else if(pn0!=null&&o.installment)o.paid_amount=Math.round(pn0*o.installment*100)/100}
     var ex=(ni&&byN[ni])||(code&&byC[code]);
-    var bs=g('br');o.branch_id=bs?bmap[cuNorm(bs)]:(ex&&!bs?(defB||ex.branch_id):defB);if(bs&&!o.branch_id)er.push('الفرع غير معروف');else if(!o.branch_id)er.push('حدد الفرع');else if(!can('all_branches')&&S.me.branch_id&&o.branch_id!=S.me.branch_id)er.push('فرع غير مسموح لك');
+    var bs=g('br'),bv=bs&&VM.br[cuNorm(bs)];o.branch_id=bs?(bmap[cuNorm(bs)]||(bv=='_def'?defB:bv)):(ex&&!bs?(defB||ex.branch_id):defB);if(bs&&!o.branch_id){UB[bs]=1;er.push('الفرع «'+bs+'» مش معروف — اربطه في «ربط القيم» فوق')}else if(!o.branch_id)er.push('حدد الفرع');else if(!can('all_branches')&&S.me.branch_id&&o.branch_id!=S.me.branch_id)er.push('فرع غير مسموح لك');
     if(!ex){if(!o.full_name)er.push('العميل مش موجود ومفيش اسم');else if(cuWords(o.full_name)<3)er.push('اسم العميل قصير')}
     if(ni&&!/^[0-9]{14}$/.test(ni))er.push('الرقم القومي لازم 14 رقم');
     if(!(o.price>0))er.push('سعر المنتج غير صحيح');if(!(o.months>=1&&o.months<=120&&o.months%1==0))er.push('المدة غير صحيحة');
@@ -647,7 +658,7 @@ async function vCon(){
     if(o.paid_amount<0||inst&&o.paid_amount>inst*o.months+0.01)er.push('المسدد أكبر من إجمالي الأقساط');
     var key=(ni||code||o.full_name)+'|'+o.start_date+'|'+o.price;if(seen[key])er.push('مكرر في الملف');
     if(er.length)bad.push({r:r,e:er.join(' + '),line:k+2,nm:o.full_name||(ex&&ex.full_name)||ni||code});else{seen[key]=1;if(!ex)newC++;o._nm=(ex&&ex.full_name)||o.full_name;ok.push(o)}});
-   S.kplan={ok:ok,bad:bad,head:rs[0]};
+   S.kplan={ok:ok,bad:bad,head:rs[0]};var vb=$('#kvbox');if(!vb){vb=document.createElement('div');vb.id='kvbox';$('#kres').parentNode.insertBefore(vb,$('#kres'))}vb.innerHTML=kvUI(Object.keys(UE),Object.keys(UB));
    $('#kres').innerHTML='<div class="alert '+(bad.length?'bad':'ok')+'">جاهز للاستيراد: <b>'+ok.length+'</b> عقد'+(newC?' (منهم '+newC+' عميل جديد هيتسجل)':'')+' · مرفوض: <b>'+bad.length+'</b></div>'+(bad.length?(function(){var c={};bad.forEach(function(b){b.e.split(' + ').forEach(function(x){c[x]=(c[x]||0)+1})});return '<div class="alert"><b>أسباب الرفض:</b><br>'+Object.keys(c).sort(function(x,y){return c[y]-c[x]}).map(function(x){return '• '+esc(x)+' — <b>'+c[x]+'</b> صف'}).join('<br>')+'</div>'})()+'<div class="wrap"><table><tr><th>الصف</th><th>العميل</th><th>السبب</th></tr>'+bad.slice(0,30).map(function(b){return '<tr><td>'+b.line+'</td><td>'+esc(b.nm||'')+'</td><td style="white-space:normal">'+esc(b.e)+'</td></tr>'}).join('')+'</table></div><div class="pay"><button class="btn" id="kbad">تنزيل الصفوف المرفوضة لتصحيحها</button></div>':'');
    $('#kgo').disabled=!ok.length;$('#kgo').textContent='استيراد '+ok.length+' عقد';return}
   if(t.id=='kbad'&&S.kplan){return dlBad('عقود-مرفوضة.xlsx',S.kplan.head,S.kplan.bad.map(function(b){return b.r.concat([b.e])}))}
