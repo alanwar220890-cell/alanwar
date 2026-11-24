@@ -1,7 +1,7 @@
 // الأنوار — Service Worker: بيخلي البرنامج يتثبت كتطبيق ويفتح أسرع.
 // البيانات نفسها (Supabase) مش بتتخزن، بتيجي دايمًا من السيرفر.
-const C = 'alanwar-v2';
-const CORE = ['./', 'index.html', 'app.js', 'config.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
+const C = 'alanwar-v3';
+const CORE = ['./', 'index.html', 'app.js', 'config.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'logo.png', 'mark.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(C).then(c => c.addAll(CORE)).catch(() => {})); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== C).map(x => caches.delete(x))))); self.clients.claim(); });
 self.addEventListener('fetch', e => {
