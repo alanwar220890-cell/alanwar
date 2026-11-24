@@ -564,6 +564,10 @@ function kvUI(UE,UB){if(!UE.length&&!UB.length)return '';var st=staffList(),bl=b
 function kBrKey(n){return cuNorm(n).replace(/\([^)]*\)/g,'').replace(/^فرع\s*/,'').replace(/\s*الرئيسي$/,'').trim()}
 function kBrFind(v){var t=cuNorm(cuDig(v)).replace(/إ/g,'ا');if(!t)return null;var best=null;brList().forEach(function(b){var k=kBrKey(b.name);if(k.length>=2&&(t.indexOf(k)>=0)&&(!best||k.length>kBrKey(best.name).length))best=b});return best}
 function kStripBr(v,b){var t=cuDig(v),n=cuNorm(t),full=cuNorm(b.name),k=n.indexOf(full)>=0?full:kBrKey(b.name),i=n.indexOf(k);if(i<0)return null;var r=(n.slice(0,i)+' '+n.slice(i+k.length)).replace(/فرع|الرئيسي/g,'').replace(/^[\s\-_\/\\.:،,|]+|[\s\-_\/\\.:،,|]+$/g,'').replace(/\s+/g,' ').trim();return r||null}
+
+// كود البرنامج القديم «كود 14 المدينة» / «هوم تك - 68أ» ← «14» / «68أ» (الفرع في خانته لوحده) — نفس code_clean في قاعدة البيانات
+function kCodeClean(v){var t=cuDig(String(v||'')).trim();if(!t)return '';if(!/[إا]كس ?فون|المدين[هة]|هوم ?تك|كود|فرع/.test(t))return t;
+ return t.replace(/[إا]كس ?فون|المدين[هة]|هوم ?تك|كود|فرع|العشرين|كرداس[هة]|حدائق القب[هة]/g,'').replace(/[\s\-_\/.:،,|]+/g,' ').trim().replace(/(\d+)\s+([^\d\s])/g,'$1$2')}
 function conTemplate(){var b0=(brList()[0]||{}).name||'',e0=xlStaff()[0]||'',p0=(S.products||[])[0],T=function(i){return {w:i,text:true}};
  dlx('قالب-استيراد-العقود.xlsx',XL.template({head:KT,
   cols:[T(14),{w:28},T(18),T(15),{w:32},{w:28},{w:16},{w:14},{w:12},{w:12},{w:20},{w:22},{w:24},{w:24},{w:12},{w:11},{w:11},{w:11},{w:13},T(13),T(13),{w:14},{w:24},{w:13},T(15),T(18),{w:28},{w:28},{w:24},{w:16},T(15),T(18),{w:28},{w:30}],
@@ -646,7 +650,7 @@ async function vCon(){
    var ms=[];if(ix.price==null&&ix.tot==null)ms.push('سعر المنتج');if(ix.months==null)ms.push('المدة');if(ix.sd==null&&ix.fdd==null)ms.push('تاريخ العقد (أو تاريخ أول قسط)');if(ix.nid==null&&ix.code==null&&ix.name==null)ms.push('الرقم القومي أو الكود أو الاسم');
    mb.innerHTML=(A.drop&&A.drop.length?'<div class="alert bad">شلت ربط «'+A.drop.map(function(k){return (KCOLS.filter(function(m){return m[0]==k})[0]||[k,k])[1]}).join('، ')+'» لأن العمود اللي كان مربوط فيه فلوس مش أسماء. لو فيه عمود فيه أسماء الموظفين اربطه من «ربط أعمدة الشيت».</div>':'')+kMapUI(rs,ix,ms.join('، '));
    if(ms.length){$('#kres').innerHTML='<div class="alert bad">مش لاقي أعمدة: '+esc(ms.join('، '))+'. اربطهم من «ربط أعمدة الشيت» فوق ودوس «فحص بالربط ده».</div>';$('#kgo').disabled=true;mb.scrollIntoView({behavior:'smooth',block:'start'});return}
-   var VM=kvGet(),UB={},UE={},EMP=xlEmpMap(),zmap={},pmap={},bmap={},byN={},byC={},ok=[],bad=[],seen={},newC=0,defB=($('#kib')&&$('#kib').value)||S.me.branch_id;S.branches.forEach(function(b){bmap[cuNorm(b.name)]=b.id});(S.zones||[]).forEach(function(z){zmap[cuNorm(z.name)]=z.id});(S.products||[]).forEach(function(x){pmap[cuNorm(x.name)]=x});cu.forEach(function(c){if(c.national_id)byN[c.national_id]=c;if(c.customer_code)byC[c.customer_code]=c});
+   var VM=kvGet(),UB={},UE={},EMP=xlEmpMap(),zmap={},pmap={},bmap={},byN={},byC={},ok=[],bad=[],seen={},newC=0,defB=($('#kib')&&$('#kib').value)||S.me.branch_id;S.branches.forEach(function(b){bmap[cuNorm(b.name)]=b.id});(S.zones||[]).forEach(function(z){zmap[cuNorm(z.name)]=z.id});(S.products||[]).forEach(function(x){pmap[cuNorm(x.name)]=x});cu.forEach(function(c){if(c.national_id)byN[c.national_id]=c;if(c.customer_code)byC[c.branch_id+'|'+c.customer_code]=c});
    rs.slice(1).forEach(function(r,k){var g=function(key){return ix[key]==null?'':String(r[ix[key]]==null?'':r[ix[key]]).trim()},er=[];
     var ni=cuDig(g('nid')).replace(/[^0-9]/g,''),ph=cuDig(g('phone')).replace(/[^0-9]/g,''),code=g('code');if(/^1[0-9]{9}$/.test(ph))ph='0'+ph;
     var o={national_id:ni||null,customer_code:code||null,full_name:g('name').replace(/\s+/g,' ')||null,phone:ph||null,address:g('addr')||null,product_name:g('prod')||null,
@@ -663,10 +667,10 @@ async function vCon(){
     if(o.installment==null&&tot0&&o.months)o.installment=Math.round(tot0/o.months*100)/100;
     if(o.price==null&&o.months&&(o.installment||tot0)){o.price=Math.round(((o.installment||0)*o.months||tot0)+(o.down_payment||0));if(!g('rate'))o.annual_rate=0}
     if(!g('paid')){var ti=(o.installment||0)*(o.months||0)||tot0||0;if(rem0!=null&&ti)o.paid_amount=Math.max(0,Math.round((ti-rem0)*100)/100);else if(pn0!=null&&o.installment)o.paid_amount=Math.round(pn0*o.installment*100)/100}
-    var ex=(ni&&byN[ni])||(code&&byC[code]);
     var bs=g('br');if(bs&&!bmap[cuNorm(bs)]){var f1=kBrFind(bs);if(f1)bs=f1.name}
     if(!bs&&o.customer_code){var f2=kBrFind(o.customer_code);if(f2)bs=f2.name}
-    var bv=bs&&VM.br[cuNorm(bs)];o.branch_id=bs?(bmap[cuNorm(bs)]||(bv=='_def'?defB:bv)):(ex&&!bs?(defB||ex.branch_id):defB);if(bs&&!o.branch_id){UB[bs]=1;er.push('الفرع «'+bs+'» مش معروف — اربطه في «ربط القيم» فوق')}else if(!o.branch_id)er.push('حدد الفرع');else if(!can('all_branches')&&S.me.branch_id&&o.branch_id!=S.me.branch_id)er.push('فرع غير مسموح لك');
+    var bv=bs&&VM.br[cuNorm(bs)],bid=bs?(bmap[cuNorm(bs)]||(bv=='_def'?defB:bv)):defB;
+    o.customer_code=kCodeClean(code)||null;var ex=(ni&&byN[ni])||(o.customer_code&&bid&&byC[bid+'|'+o.customer_code]);if(!bs&&ex)bid=defB||ex.branch_id;o.branch_id=bid;if(bs&&!o.branch_id){UB[bs]=1;er.push('الفرع «'+bs+'» مش معروف — اربطه في «ربط القيم» فوق')}else if(!o.branch_id)er.push('حدد الفرع');else if(!can('all_branches')&&S.me.branch_id&&o.branch_id!=S.me.branch_id)er.push('فرع غير مسموح لك');
     if(!ex){if(!o.full_name)er.push('العميل مش موجود ومفيش اسم');else if(cuWords(o.full_name)<2)er.push('اسم العميل لازم كلمتين على الأقل')}
     if(ni&&!/^[0-9]{14}$/.test(ni))er.push('الرقم القومي لازم 14 رقم');
     if(!(o.price>0))er.push('سعر المنتج غير صحيح');if(!(o.months>=1&&o.months<=120&&o.months%1==0))er.push('المدة غير صحيحة');
@@ -675,7 +679,7 @@ async function vCon(){
     if(o.installment!=null&&!(o.installment>0))er.push('قيمة القسط غير صحيحة');
     var inst=o.installment||(o.price&&o.months?Math.round((o.price-o.down_payment)*(1+o.annual_rate/100*o.months/12)/o.months*100)/100:0);
     if(o.paid_amount<0||inst&&o.paid_amount>inst*o.months+0.01)er.push('المسدد أكبر من إجمالي الأقساط');
-    var key=code?'c|'+code:(ni||o.full_name)+'|'+o.start_date+'|'+o.price;if(seen[key])er.push('مكرر في الملف');
+    var key=o.customer_code?'c|'+o.branch_id+'|'+o.customer_code:(ni||o.full_name)+'|'+o.start_date+'|'+o.price;if(seen[key])er.push('مكرر في الملف');
     if(er.length)bad.push({r:r,e:er.join(' + '),line:k+2,nm:o.full_name||(ex&&ex.full_name)||ni||code});else{seen[key]=1;if(!ex)newC++;o._nm=(ex&&ex.full_name)||o.full_name;ok.push(o)}});
    S.kplan={ok:ok,bad:bad,head:rs[0]};var vb=$('#kvbox');if(!vb){vb=document.createElement('div');vb.id='kvbox';$('#kres').parentNode.insertBefore(vb,$('#kres'))}vb.innerHTML=kvUI(Object.keys(UE),Object.keys(UB));
    $('#kres').innerHTML='<div class="alert '+(bad.length?'bad':'ok')+'">جاهز للاستيراد: <b>'+ok.length+'</b> عقد'+(newC?' (منهم '+newC+' عميل جديد هيتسجل)':'')+' · مرفوض: <b>'+bad.length+'</b></div>'+(bad.length?(function(){var c={};bad.forEach(function(b){b.e.split(' + ').forEach(function(x){x=x.replace(/«[^»]*»/g,'(قيم مختلفة)');c[x]=(c[x]||0)+1})});return '<div class="alert"><b>أسباب الرفض:</b><br>'+Object.keys(c).sort(function(x,y){return c[y]-c[x]}).map(function(x){return '• '+esc(x)+' — <b>'+c[x]+'</b> صف'}).join('<br>')+'</div>'})()+'<div class="wrap"><table><tr><th>الصف</th><th>العميل</th><th>السبب</th></tr>'+bad.slice(0,30).map(function(b){return '<tr><td>'+b.line+'</td><td>'+esc(b.nm||'')+'</td><td style="white-space:normal">'+esc(b.e)+'</td></tr>'}).join('')+'</table></div><div class="pay"><button class="btn" id="kbad">تنزيل الصفوف المرفوضة لتصحيحها</button></div>':'');
