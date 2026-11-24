@@ -467,7 +467,7 @@ function phCard(){return '<details class="card" id="phc" open style="border:2px 
  '<div class="f"><div><label for="phk">نوع الورق</label><select id="phk"><option value="contract">بيعة (عقد حالي أو منتهي)</option><option value="inquiry">استعلام قديم ملغي أو مرفوض</option></select></div></div>'+
  '<div class="pay"><label class="btn am">📷 صوّر<input type="file" accept="image/*" capture="environment" id="phcam" hidden></label><label class="btn">🖼 من الصور<input type="file" accept="image/*" multiple id="phgal" hidden></label><button class="btn" id="phrun" disabled>اقرا البيانات</button><button class="btn sm" id="phclr">مسح الصور</button></div><div id="phth" class="pay" style="gap:6px"></div><div id="phres"></div></details>'}
 function phThumbs(){var b=$('#phth');if(!b)return;b.innerHTML=PH.imgs.map(function(x,i){return '<span style="position:relative;display:inline-block"><img src="data:'+x.mime+';base64,'+x.b64+'" alt="صورة '+(i+1)+'" style="height:70px;border-radius:6px;border:1px solid var(--ln)"><button class="btn sm" data-phx="'+i+'" style="position:absolute;top:-6px;left:-6px;min-height:0;padding:0 6px">×</button></span>'}).join('')+(PH.imgs.length?'<span class="hint">'+PH.imgs.length+' / 6</span>':'');var r=$('#phrun');if(r)r.disabled=!PH.imgs.length}
-async function phAdd(files){for(var i=0;i<files.length&&PH.imgs.length<6;i++){try{var f=await prepFile(files[i],1800);if(/pdf/i.test(f.type||''))continue;var b64=await new Promise(function(ok,no){var r=new FileReader();r.onload=function(){ok(String(r.result).split(',')[1])};r.onerror=no;r.readAsDataURL(f)});PH.imgs.push({b64:b64,mime:f.type&&/^image\/(jpeg|png|webp)$/.test(f.type)?f.type:'image/jpeg',file:f})}catch(e){msg(e.message||'تعذّر قراءة الصورة',1)}}phThumbs()}
+async function phAdd(files){for(var i=0;i<files.length&&PH.imgs.length<6;i++){try{var f=await prepFile(files[i],1600);if(/pdf/i.test(f.type||''))continue;var b64=await new Promise(function(ok,no){var r=new FileReader();r.onload=function(){ok(String(r.result).split(',')[1])};r.onerror=no;r.readAsDataURL(f)});PH.imgs.push({b64:b64,mime:f.type&&/^image\/(jpeg|png|webp)$/.test(f.type)?f.type:'image/jpeg',file:f})}catch(e){msg(e.message||'تعذّر قراءة الصورة',1)}}phThumbs()}
 function phIn(id,lb,v,typ,extra){return '<div><label for="'+id+'">'+lb+'</label><input id="'+id+'"'+(typ?' type="'+typ+'"':'')+' value="'+esc(v==null?'':v)+'"'+(extra||'')+'></div>'}
 function phSel(id,lb,L,v,ph){return '<div><label for="'+id+'">'+lb+'</label><select id="'+id+'">'+(ph!=null?'<option value="">'+ph+'</option>':'')+L.map(function(o){return '<option value="'+esc(o[0])+'"'+(o[0]==v?' selected':'')+'>'+esc(o[1])+'</option>'}).join('')+'</select></div>'}
 function phFind(L,name,key){var n=cuNorm(name||'');if(!n)return '';var m=L.filter(function(x){var a=cuNorm(x[key]);return a==n||a.indexOf(n)>=0||n.indexOf(a)>=0})[0];return m?m.id:''}
@@ -510,9 +510,13 @@ async function phSave(btn){var K=PH.kind=='inquiry',bu=phP('phbu'),g1=phP('phg1'
 async function phClick(t){if(t.id=='phclr'){PH.imgs=[];PH.r=null;phThumbs();$('#phres').innerHTML='';return true}
  var x0=t.getAttribute&&t.getAttribute('data-phx');if(x0!=null){PH.imgs.splice(+x0,1);phThumbs();return true}
  if(t.id=='phall'){var a=+phV('phin'),m=+phV('phm');if(a&&m){$('#phpd').value=Math.round(a*m*100)/100}else msg('اكتب القسط والمدة الأول',1);return true}
- if(t.id=='phrun'){PH.kind=$('#phk').value;t.disabled=true;$('#phres').innerHTML='<p class="hint">⏳ الذكاء الاصطناعي بيقرا الصور… ممكن ياخد لحد دقيقة.</p>';
-  var x=await sb.functions.invoke('doc-ocr',{body:{kind:PH.kind,images:PH.imgs.map(function(i){return {b64:i.b64,mime:i.mime}})}}),er=await fnErr(x),r=x.data||{};t.disabled=false;
-  if(er||r.error){$('#phres').innerHTML='<div class="alert bad">'+esc(er||r.error)+'</div>';return true}
+ if(t.id=='phrun'){PH.kind=$('#phk').value;t.disabled=true;$('#phres').innerHTML='<p class="hint">⏳ الذكاء الاصطناعي بيقرا الصور… ممكن ياخد لحد دقيقتين، سيب الصفحة مفتوحة.</p>';
+  var x,er,r;for(var at=0;at<3;at++){x=await sb.functions.invoke('doc-ocr',{body:{kind:PH.kind,images:PH.imgs.map(function(i){return {b64:i.b64,mime:i.mime}})}});er=await fnErr(x);r=x.data||{};
+   if(!(r.busy||/demand|overload|503|429/i.test(String(er||r.error||'')))||at==2)break;
+   for(var w=30;w>0;w--){$('#phres').innerHTML='<p class="hint">⏳ خدمة الذكاء الاصطناعي زحمة دلوقتي. هنحاول تاني لوحدنا بعد '+w+' ثانية… (محاولة '+(at+2)+' من 3) — سيب الصفحة مفتوحة.</p>';await new Promise(function(z){setTimeout(z,1000)})}
+   $('#phres').innerHTML='<p class="hint">⏳ بنحاول تاني…</p>'}
+  t.disabled=false;
+  if(er||r.error){var em0=String(er||r.error);if(/demand|overload|503|429|ضغط/i.test(em0))em0='خدمة الذكاء الاصطناعي عليها ضغط كبير دلوقتي. الصور محفوظة هنا، جرّب «اقرا البيانات» تاني بعد شوية.';$('#phres').innerHTML='<div class="alert bad">'+esc(em0)+'</div>';return true}
   PH.r=r;$('#phres').innerHTML=phForm(r);return true}
  if(t.id=='phsave'){if(await phSave(t)){$('#phres').innerHTML='<div class="alert ok">اتحفظ ✓ تقدر تصوّر البيعة اللي بعدها.</div>';phThumbs();if(PH.kind=='contract')setTimeout(function(){vCon()},1200)}return true}
  return false}

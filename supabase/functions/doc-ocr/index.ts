@@ -31,25 +31,29 @@ async function vision(imgs: { b64: string; mime: string }[], PROMPT: string, adm
   const key = prov === 'openai' ? okey! : gkey!;
   const url = prov === 'openai' ? 'https://api.openai.com/v1/chat/completions' : 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
   let models = [(prov === 'openai' ? c.model : c.gemini_model) || (prov === 'openai' ? 'gpt-5.4-mini' : 'gemini-3.8-flash')];
-  if (prov === 'gemini') { try { const l = await (await fetch('https://generativelanguage.googleapis.com/v1beta/openai/models', { headers: { Authorization: `Bearer ${key}` } })).json(); const ids = (l?.data || []).map((x: any) => String(x.id).replace(/^models\//, '')).filter((x: string) => /flash/.test(x) && !/image|tts|audio|live|embed|preview|exp/.test(x)); const v = (x: string) => parseFloat((x.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || '0'); ids.sort((a: string, b: string) => v(b) - v(a)); models = [...new Set([...models, ...ids.slice(0, 5)])]; } catch (_) { /**/ } }
-  let last = '';
-  for (const m of models) {
-    for (let t = 0; t < 2; t++) {
+  if (prov === 'gemini') { try { const l = await (await fetch('https://generativelanguage.googleapis.com/v1beta/openai/models', { headers: { Authorization: `Bearer ${key}` } })).json(); const all = (l?.data || []).map((x: any) => String(x.id).replace(/^models\//, '')).filter((x: string) => /^gemini/.test(x) && !/image|tts|audio|live|embed|preview|exp|thinking/.test(x)); const v = (x: string) => parseFloat((x.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || '0'); all.sort((a: string, b: string) => v(b) - v(a)); const fl = all.filter((x: string) => /flash/.test(x)), pro = all.filter((x: string) => /pro/.test(x)); models = [...new Set([...models, ...fl.slice(0, 8), ...pro.slice(0, 2)])]; } catch (_) { /**/ } }
+  let last = '', busy = 0; const t0 = Date.now();
+  // بنلف على كل الموديلات أكتر من دورة، ولو كلهم زحمة بنستنى شوية ونحاول تاني (لحد ~100 ثانية)
+  for (let round = 0; round < 4 && Date.now() - t0 < 100000; round++) {
+    for (const m of models) {
+      if (Date.now() - t0 > 100000) break;
       const body: any = { model: m, messages: [{ role: 'system', content: 'انت نظام OCR دقيق جدًا لمستندات شركات البيع بالتقسيط في مصر (عقود، إيصالات أمانة، كمبيالات، استمارات استعلام، صور بطايق). رد بـ JSON بس.' }, { role: 'user', content: [{ type: 'text', text: PROMPT }, ...imgs.map((i) => ({ type: 'image_url', image_url: { url: `data:${i.mime};base64,${i.b64}` } }))] }], response_format: { type: 'json_object' } };
       if (prov === 'openai') body.max_completion_tokens = 4000; else { body.max_tokens = 4000; body.reasoning_effort = 'low'; }
-      const r = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      let r: Response; try { r = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); } catch (e) { last = String(e); continue; }
       const j0 = await r.json().catch(() => ({})); const j = Array.isArray(j0) ? j0[0] : j0;
       if (r.ok) {
         const txt = j.choices?.[0]?.message?.content || '';
         await admin.from('ai_usage').insert({ tenant_id: tenant, user_id: null, model: prov + ':' + m + ':doc', prompt_tokens: j.usage?.prompt_tokens || 0, completion_tokens: j.usage?.completion_tokens || 0 });
-        const mm = txt.match(/\{[\s\S]*\}/); try { return { model: m, ...JSON.parse(mm ? mm[0] : txt) }; } catch (_) { return { error: 'الرد مش مفهوم، جرّب صورة أوضح' }; }
+        const mm = txt.match(/\{[\s\S]*\}/); try { return { model: m, ...JSON.parse(mm ? mm[0] : txt) }; } catch (_) { last = 'الرد مش مفهوم'; continue; }
       }
       last = String(j?.error?.message || r.status);
-      if (prov === 'openai' || !/demand|overload|unavailable|503|429|not found|no longer|quota|exhausted/i.test(last + r.status)) return { error: last };
-      if (t === 0) await new Promise((z) => setTimeout(z, 1200));
+      const retry = /demand|overload|unavailable|503|429|500|not found|no longer|quota|exhausted|deadline|internal/i.test(last + ' ' + r.status);
+      if (!retry) return { error: last };
+      if (/demand|overload|unavailable|503|429/i.test(last + ' ' + r.status)) busy++;
     }
+    await new Promise((z) => setTimeout(z, 3000 * (round + 1)));
   }
-  return { error: last };
+  return { error: busy ? 'BUSY' : last };
 }
 
 
@@ -93,7 +97,7 @@ Deno.serve(async (req) => {
     if (imgs.reduce((s: number, i: any) => s + i.b64.length, 0) > 18_000_000) return out(400, { error: 'الصور كبيرة جدًا، قلّل عددها' });
     const PS = '__P__', PJ = '__PJ__';
     const r: any = await vision(imgs, (kind === 'inquiry' ? PI : PC).split(PS).join(PJ).replace(/__PJ__/g, '{"name":"الاسم كامل","national_id":"14 رقم","phone":"موبايل 11 رقم","address":"العنوان","id_address":"عنوان البطاقة لو مكتوب","relation":"صلة القرابة بالمشتري (للضامن)","job":"المهنة","employer":"جهة العمل"}'), admin, me!.tenant_id);
-    if (r.error) return out(200, { error: 'الذكاء الاصطناعي ما قدرش يقرا الصور: ' + r.error });
+    if (r.error) return out(200, r.error === 'BUSY' ? { error: 'خدمة الذكاء الاصطناعي عليها ضغط كبير دلوقتي ومش فاضية. جرّب تاني بعد دقيقتين.', busy: true } : { error: 'الذكاء الاصطناعي ما قدرش يقرا الصور: ' + r.error });
     const warn: string[] = [];
     const res: any = { kind, model: r.model, confidence: r.confidence != null ? +r.confidence : null, unclear: Array.isArray(r.unclear) ? r.unclear.map(clean).filter(Boolean).slice(0, 15) : [], notes: clean(r.notes), branch: clean(r.branch),
       buyer: person(r.buyer, warn, 'المشتري'), guarantor1: person(r.guarantor1, warn, 'الضامن الأول'), guarantor2: person(r.guarantor2, warn, 'الضامن الثاني'), housing: clean(r.housing) };
