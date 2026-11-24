@@ -197,8 +197,8 @@ function waMark(k){try{var d=JSON.parse(localStorage.getItem('waSent')||'{}');Ob
 function waBtn(o){var u=waUrl(o);return u?'<a class="btn wa'+(waSent(o.k)?' sent':'')+'" href="'+esc(u)+'" target="_blank" rel="noopener" data-wak="'+esc(o.k)+'" title="'+esc((WA_T.filter(function(x){return x.k==waTier(o)})[0]||{}).t||'واتساب')+'">'+WA_ICO+(waSent(o.k)?' اتبعت':' واتساب')+'</a>':'<span class="btn wa off" title="رقم الهاتف غير صحيح">'+WA_ICO+' مفيش رقم</span>'}
 function accPanel(){
  var old=$('#cm');if(old)old.remove();var m=document.createElement('div');m.id='cm';m.className='md';var br=bn(S.me.branch_id),mine=effPerms(Object.assign({},S.me,{perms:S.me.role=='system_admin'?null:S.perms}));
- m.innerHTML='<div class="card"><div class="row"><h2>حسابي</h2><button class="btn" data-clo="1">إغلاق</button></div><table class="kv"><tr><th>الاسم</th><td>'+esc(S.me.full_name)+'</td></tr><tr><th>الوظيفة</th><td>'+esc(RL[S.me.role])+'</td></tr><tr><th>الفرع</th><td>'+(esc(br)||'—')+'</td></tr><tr><th>البريد (لتسجيل الدخول)</th><td dir="ltr" style="text-align:right">'+esc(S.me.email||'—')+'</td></tr></table><h3>صلاحياتي</h3>'+PG.map(function(g){var l=g.p.filter(function(x){return mine.indexOf(x[0])>=0});return l.length?'<div class="pgx"><b>'+pico(g.ic)+' '+g.t+'</b><div class="pchips">'+l.map(function(x){return '<span class="pchip on">'+pico(x[2])+esc(x[1])+'</span>'}).join('')+'</div></div>':''}).join('')+'<div id="accmfa" style="margin-top:10px"></div></div>';
- document.body.appendChild(m);accMfa(m.querySelector('#accmfa'));m.onclick=function(e){if(e.target===m||e.target.getAttribute('data-clo'))m.remove()}
+ m.innerHTML='<div class="card"><div class="row"><h2>حسابي</h2><button class="btn" data-clo="1">إغلاق</button></div><table class="kv"><tr><th>الاسم</th><td>'+esc(S.me.full_name)+'</td></tr><tr><th>الوظيفة</th><td>'+esc(RL[S.me.role])+'</td></tr><tr><th>الفرع</th><td>'+(esc(br)||'—')+'</td></tr><tr><th>البريد (لتسجيل الدخول)</th><td dir="ltr" style="text-align:right">'+esc(S.me.email||'—')+'</td></tr></table><div class="pay"><button class="btn sm" id="apprl">🔄 تحديث البرنامج لآخر نسخة</button><span class="hint">النسخة: '+esc(APPV||'—')+'</span></div><h3>صلاحياتي</h3>'+PG.map(function(g){var l=g.p.filter(function(x){return mine.indexOf(x[0])>=0});return l.length?'<div class="pgx"><b>'+pico(g.ic)+' '+g.t+'</b><div class="pchips">'+l.map(function(x){return '<span class="pchip on">'+pico(x[2])+esc(x[1])+'</span>'}).join('')+'</div></div>':''}).join('')+'<div id="accmfa" style="margin-top:10px"></div></div>';
+ document.body.appendChild(m);accMfa(m.querySelector('#accmfa'));m.onclick=function(e){if(e.target.id=='apprl')return appHardReload();if(e.target===m||e.target.getAttribute('data-clo'))m.remove()}
 }
 function bn(id){var b=(S.branchesAll||S.branches).filter(function(x){return x.id==id})[0];return b?b.name:''}
 
@@ -2328,3 +2328,13 @@ function readImport(f,cb){if(/\.xlsx$/i.test(f.name)){XL.read(f).then(function(r
  var fr=new FileReader();fr.onload=function(){cb(fr.result)};fr.readAsText(f,'utf-8')}
 // صفوف مرفوضة → Excel بنفس العناوين + السبب
 function dlBad(name,head,rows){dlx(name,XL.write([{name:'البيانات',head:1,tab:1,rows:[head.concat(['سبب الرفض'])].concat(rows),cols:head.map(function(){return {w:20,text:true}}).concat([{w:40}])}]))}
+
+// ===== التأكد إن الموبايل شغال على آخر نسخة من البرنامج
+var APPV=(function(){try{var x=document.querySelector('script[src*="app.js?v="]');return x?(x.getAttribute('src').match(/v=(\d+)/)||[])[1]:''}catch(e){return ''}})();
+async function appHardReload(){try{if(window.caches){var k=await caches.keys();await Promise.all(k.map(function(n){return caches.delete(n)}))}}catch(e){}
+ try{if(navigator.serviceWorker){var rs=await navigator.serviceWorker.getRegistrations();await Promise.all(rs.map(function(r){return r.unregister()}))}}catch(e){}
+ location.replace(location.pathname+'?r='+Date.now())}
+async function verCheck(){try{if(!APPV||location.protocol!='https:')return;var t=await (await fetch('index.html?nc='+Date.now(),{cache:'no-store'})).text(),m=t.match(/app\.js\?v=(\d+)/);
+ if(m&&m[1]!=APPV&&!$('#verbar')){var d=document.createElement('div');d.id='verbar';d.className='alert ok';d.style.cssText='position:fixed;bottom:12px;left:12px;right:12px;z-index:60;display:flex;gap:8px;align-items:center;background:var(--sf);box-shadow:0 4px 18px rgba(0,0,0,.2)';
+  d.innerHTML='<span style="flex:1">فيه نسخة جديدة من البرنامج 🎉</span><button class="btn sm am" id="verup">تحديث دلوقتي</button>';document.body.appendChild(d);$('#verup').onclick=appHardReload}}catch(e){}}
+setTimeout(verCheck,4000);setInterval(verCheck,300000);document.addEventListener('visibilitychange',function(){if(!document.hidden)verCheck()});
