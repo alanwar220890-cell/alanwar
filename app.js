@@ -71,7 +71,7 @@ async function refreshMe(){
  if(old!==S.sig){var cur=S.cur;shell();go(S.nav.indexOf(cur)>=0?cur:S.nav[0]);msg('تم تحديث صلاحياتك')}
 }
 function live(){
- try{if(S.ch)sb.removeChannel(S.ch);S.ch=sb.channel('me-'+S.me.id).on('postgres_changes',{event:'UPDATE',schema:'public',table:'profiles',filter:'id=eq.'+S.me.id},function(){refreshMe()}).on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'user_id=eq.'+S.me.id},function(p){ntNew(p.new)}).subscribe()}catch(e){}
+ try{if(S.ch)sb.removeChannel(S.ch);S.ch=sb.channel('me-'+S.me.id).on('postgres_changes',{event:'UPDATE',schema:'public',table:'profiles',filter:'id=eq.'+S.me.id},function(){refreshMe()}).on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'user_id=eq.'+S.me.id},function(p){NT.last=p.new&&p.new.created_at||NT.last;ntNew(p.new)}).subscribe();ntPoll()}catch(e){}
  clearInterval(S.pt);S.pt=setInterval(function(){refreshMe();ntLoad()},60000);
  if(!live.b){live.b=1;document.addEventListener('visibilitychange',async function(){if(document.hidden||!S.me)return;if(!(await sessOk())){S.me=null;return loginView('انتهت جلستك، ادخل تاني.')}refreshMe()})}
 }
@@ -1542,13 +1542,26 @@ async function vCash(){
 /* ---------- الإشعارات ---------- */
 var BELL='<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>';
 async function ntLoad(){try{var r=await sb.from('notifications').select('id',{count:'exact',head:true}).is('read_at',null);var c=r.count||0,b=$('#nbc');if(b){b.textContent=c>99?'99+':c||'';b.hidden=!c}}catch(e){}}
-function ntNew(x){ntLoad();if(x&&x.title)msg('🔔 '+x.title+(x.body?' — '+x.body:''))}
+var NT={snd:function(){try{return localStorage.getItem('ntSnd')!=='0'}catch(e){return true}},ctx:null,seen:{}};
+function ntUnlock(){try{if(!NT.ctx){var A=window.AudioContext||window.webkitAudioContext;if(A)NT.ctx=new A()}if(NT.ctx&&NT.ctx.state=='suspended')NT.ctx.resume()}catch(e){}}
+['pointerdown','keydown','touchstart'].forEach(function(ev){document.addEventListener(ev,ntUnlock,{passive:true})});
+function ntBeep(){if(!NT.snd())return;try{ntUnlock();var c=NT.ctx;if(!c)return;var t=c.currentTime;[[880,0],[1175,0.16],[1568,0.32]].forEach(function(f){var o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.value=f[0];g.gain.setValueAtTime(0.0001,t+f[1]);g.gain.exponentialRampToValueAtTime(0.35,t+f[1]+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+f[1]+0.28);o.connect(g);g.connect(c.destination);o.start(t+f[1]);o.stop(t+f[1]+0.3)})}catch(e){}
+ try{if(navigator.vibrate)navigator.vibrate([180,80,180])}catch(e){}}
+function ntDevice(x){try{if(!('Notification' in window)||Notification.permission!='granted'||!document.hidden)return;var o={body:x.body||'',icon:'icon-192.png',badge:'icon-192.png',tag:'n'+x.id,data:{view:x.view||''},vibrate:[180,80,180]};
+ if(navigator.serviceWorker&&navigator.serviceWorker.getRegistration)navigator.serviceWorker.getRegistration().then(function(r){if(r)r.showNotification(x.title,o);else new Notification(x.title,o)});else new Notification(x.title,o)}catch(e){}}
+function ntNew(x){if(x&&x.id){if(NT.seen[x.id])return;NT.seen[x.id]=1}ntLoad();if(!x||!x.title)return;ntBeep();ntDevice(x);msg('🔔 '+x.title+(x.body?' — '+x.body:''))}
+// احتياطي لو الاتصال المباشر وقع: كل دقيقة نشوف لو فيه إشعار جديد
+function ntPoll(){clearInterval(NT.pt);NT.last=new Date().toISOString();NT.pt=setInterval(async function(){if(!S.me)return clearInterval(NT.pt);try{var r=await sb.from('notifications').select('*').gt('created_at',NT.last).order('created_at').limit(5);(r.data||[]).forEach(function(x){NT.last=x.created_at;ntNew(x)})}catch(e){}},60000)}
+try{navigator.serviceWorker&&navigator.serviceWorker.addEventListener('message',function(e){var v=e.data&&e.data.ntGo;if(v&&S.nav&&S.nav.indexOf(v)>=0)go(v)})}catch(e){}
 function ntAgo(ts){var s=(Date.now()-new Date(ts))/1000;return s<60?'دلوقتي':s<3600?'من '+Math.floor(s/60)+' دقيقة':s<86400?'من '+Math.floor(s/3600)+' ساعة':fd(ldate(ts))}
 async function ntPanel(){var old=$('#ntm');if(old){old.remove();return}var r=await sb.from('notifications').select('*').order('created_at',{ascending:false}).limit(40),L=r.data||[];
  var m=document.createElement('div');m.id='ntm';m.className='md';
- m.innerHTML='<div class="card" style="max-width:520px;margin:8vh auto 0"><div class="row"><h2>الإشعارات</h2><span class="pay" style="margin:0">'+(L.some(function(x){return !x.read_at})?'<button class="btn sm" id="ntall">تعليم الكل كمقروء</button>':'')+'<button class="btn sm" id="ntx">إغلاق</button></span></div>'+(L.map(function(x){return '<div class="ntit'+(x.read_at?'':' un')+'" data-nt="'+x.id+'" data-nv="'+esc(x.view||'')+'" role="button" tabindex="0"><b>'+esc(x.title)+'</b>'+(x.body?'<div>'+esc(x.body)+'</div>':'')+'<div class="hint">'+ntAgo(x.created_at)+'</div></div>'}).join('')||'<p class="hint">مفيش إشعارات.</p>')+'</div>';
+ m.innerHTML='<div class="card" style="max-width:520px;margin:8vh auto 0"><div class="row"><h2>الإشعارات</h2><span class="pay" style="margin:0">'+(L.some(function(x){return !x.read_at})?'<button class="btn sm" id="ntall">تعليم الكل كمقروء</button>':'')+'<button class="btn sm" id="ntx">إغلاق</button></span></div><div class="pay" style="margin:4px 0 8px"><button class="btn sm" id="ntsnd">'+(NT.snd()?'🔊 الصوت شغال':'🔇 الصوت مقفول')+'</button>'+(('Notification' in window)&&Notification.permission!='granted'?'<button class="btn sm am" id="ntdev">تفعيل إشعارات الموبايل/الجهاز</button>':'')+'<button class="btn sm" id="nttest">تجربة الصوت</button></div>'+(L.map(function(x){return '<div class="ntit'+(x.read_at?'':' un')+'" data-nt="'+x.id+'" data-nv="'+esc(x.view||'')+'" role="button" tabindex="0"><b>'+esc(x.title)+'</b>'+(x.body?'<div>'+esc(x.body)+'</div>':'')+'<div class="hint">'+ntAgo(x.created_at)+'</div></div>'}).join('')||'<p class="hint">مفيش إشعارات.</p>')+'</div>';
  document.body.appendChild(m);
- m.onclick=async function(e){if(e.target==m||e.target.id=='ntx')return m.remove();if(e.target.id=='ntall'){await sb.from('notifications').update({read_at:new Date().toISOString()}).is('read_at',null);m.remove();return ntLoad()}
+ m.onclick=async function(e){if(e.target==m||e.target.id=='ntx')return m.remove();
+  if(e.target.id=='ntsnd'){try{localStorage.setItem('ntSnd',NT.snd()?'0':'1')}catch(_){}e.target.textContent=NT.snd()?'🔊 الصوت شغال':'🔇 الصوت مقفول';if(NT.snd())ntBeep();return}
+  if(e.target.id=='nttest'){ntUnlock();var sv=NT.snd;NT.snd=function(){return true};ntBeep();NT.snd=sv;return}
+  if(e.target.id=='ntdev'){try{var pr=await Notification.requestPermission();if(pr=='granted'){e.target.remove();msg('اتفعّلت إشعارات الجهاز ✓')}else msg('الإذن اترفض. فعّله من إعدادات المتصفح للموقع ده',1)}catch(_){msg('المتصفح ده مش بيدعم إشعارات الجهاز',1)}return}if(e.target.id=='ntall'){await sb.from('notifications').update({read_at:new Date().toISOString()}).is('read_at',null);m.remove();return ntLoad()}
   var it=e.target.closest('[data-nt]');if(!it)return;await sb.from('notifications').update({read_at:new Date().toISOString()}).eq('id',it.getAttribute('data-nt')).is('read_at',null);m.remove();ntLoad();var vw=it.getAttribute('data-nv');if(vw&&S.nav.indexOf(vw)>=0)go(vw)}}
 /* ---------- إيصال واتساب بعد التحصيل ---------- */
 async function payWA(cid,am,dt){try{var r=await Promise.all([sb.from('contracts').select('code,product_name,customers(full_name,phone)').eq('id',cid).single(),sb.from('installments').select('amount,paid,due_date').eq('contract_id',cid)]);
