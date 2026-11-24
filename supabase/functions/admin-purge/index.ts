@@ -15,6 +15,8 @@ Deno.serve(async (req) => {
     if (!u?.user?.email) return out(401, { error: 'سجّل دخول الأول' });
     const { data: me } = await admin.from('profiles').select('id,tenant_id,role,active').eq('id', u.user.id).single();
     if (!me || !me.active || me.role !== 'system_admin') return out(403, { error: 'الحذف متاح لمدير النظام بس' });
+    const { data: mok } = await db.rpc('mfa_ok');
+    if (mok !== true) return out(403, { error: 'ادخل بالتحقق بخطوتين الأول' });
     const body = await req.json().catch(() => ({}));
     const kind = String(body.kind || ''), ids = Array.isArray(body.ids) ? body.ids.filter((x: any) => UUID.test(String(x))) : [];
     if (!KINDS.includes(kind)) return out(400, { error: 'نوع الحذف غير معروف' });
@@ -29,6 +31,8 @@ Deno.serve(async (req) => {
     if (error) return out(400, { error: error.message });
     const files: string[] = (data?.files || []).filter(Boolean);
     for (let i = 0; i < files.length; i += 100) { try { await admin.storage.from('inv-docs').remove(files.slice(i, i + 100)); } catch (_) { /**/ } }
+    const nd = data?.deleted || 0;
+    if (nd >= 20 || kind === 'customer') { try { await admin.rpc('sec_notify_admins', { t: me.tenant_id, ttl: 'تنبيه حذف بيانات', body: `اتحذف ${nd} (${kind}) بواسطة المدير العام${body.reason ? ' — السبب: ' + String(body.reason).slice(0, 200) : ''}` }); } catch (_) { /**/ } }
     return out(200, { deleted: data?.deleted || 0, files: files.length });
   } catch (e) { return out(500, { error: String((e as Error).message || e) }); }
 });
