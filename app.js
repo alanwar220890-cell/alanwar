@@ -561,8 +561,8 @@ function kvUI(UE,UB){if(!UE.length&&!UB.length)return '';var st=staffList(),bl=b
   '</table></div><div class="pay"><button class="btn am" id="kvgo">طبّق الربط وافحص تاني</button></div></div>'}
 
 // الفرع مكتوب جنب الكود في البرنامج القديم (مثلًا «الهرم 125» أو «125-فرع الهرم»): نطلّع الفرع ونسيب الكود لوحده
-function kBrKey(n){return cuNorm(n).replace(/^فرع\s*/,'').replace(/\s*الرئيسي$/,'').trim()}
-function kBrFind(v){var t=cuNorm(cuDig(v));if(!t)return null;var best=null;brList().forEach(function(b){var k=kBrKey(b.name);if(k.length>=2&&(t.indexOf(k)>=0)&&(!best||k.length>kBrKey(best.name).length))best=b});return best}
+function kBrKey(n){return cuNorm(n).replace(/\([^)]*\)/g,'').replace(/^فرع\s*/,'').replace(/\s*الرئيسي$/,'').trim()}
+function kBrFind(v){var t=cuNorm(cuDig(v)).replace(/إ/g,'ا');if(!t)return null;var best=null;brList().forEach(function(b){var k=kBrKey(b.name);if(k.length>=2&&(t.indexOf(k)>=0)&&(!best||k.length>kBrKey(best.name).length))best=b});return best}
 function kStripBr(v,b){var t=cuDig(v),n=cuNorm(t),full=cuNorm(b.name),k=n.indexOf(full)>=0?full:kBrKey(b.name),i=n.indexOf(k);if(i<0)return null;var r=(n.slice(0,i)+' '+n.slice(i+k.length)).replace(/فرع|الرئيسي/g,'').replace(/^[\s\-_\/\\.:،,|]+|[\s\-_\/\\.:،,|]+$/g,'').replace(/\s+/g,' ').trim();return r||null}
 function conTemplate(){var b0=(brList()[0]||{}).name||'',e0=xlStaff()[0]||'',p0=(S.products||[])[0],T=function(i){return {w:i,text:true}};
  dlx('قالب-استيراد-العقود.xlsx',XL.template({head:KT,
@@ -665,7 +665,7 @@ async function vCon(){
     if(!g('paid')){var ti=(o.installment||0)*(o.months||0)||tot0||0;if(rem0!=null&&ti)o.paid_amount=Math.max(0,Math.round((ti-rem0)*100)/100);else if(pn0!=null&&o.installment)o.paid_amount=Math.round(pn0*o.installment*100)/100}
     var ex=(ni&&byN[ni])||(code&&byC[code]);
     var bs=g('br');if(bs&&!bmap[cuNorm(bs)]){var f1=kBrFind(bs);if(f1)bs=f1.name}
-    if(!bs&&o.customer_code){var f2=kBrFind(o.customer_code);if(f2){bs=f2.name;var cc=kStripBr(o.customer_code,f2);if(cc){o.customer_code=cc}}}else if(o.customer_code&&bs){var f3=kBrFind(o.customer_code);if(f3){var cc2=kStripBr(o.customer_code,f3);if(cc2)o.customer_code=cc2}}
+    if(!bs&&o.customer_code){var f2=kBrFind(o.customer_code);if(f2)bs=f2.name}
     var bv=bs&&VM.br[cuNorm(bs)];o.branch_id=bs?(bmap[cuNorm(bs)]||(bv=='_def'?defB:bv)):(ex&&!bs?(defB||ex.branch_id):defB);if(bs&&!o.branch_id){UB[bs]=1;er.push('الفرع «'+bs+'» مش معروف — اربطه في «ربط القيم» فوق')}else if(!o.branch_id)er.push('حدد الفرع');else if(!can('all_branches')&&S.me.branch_id&&o.branch_id!=S.me.branch_id)er.push('فرع غير مسموح لك');
     if(!ex){if(!o.full_name)er.push('العميل مش موجود ومفيش اسم');else if(cuWords(o.full_name)<2)er.push('اسم العميل لازم كلمتين على الأقل')}
     if(ni&&!/^[0-9]{14}$/.test(ni))er.push('الرقم القومي لازم 14 رقم');
