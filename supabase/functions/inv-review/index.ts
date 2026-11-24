@@ -1,6 +1,7 @@
 // الأنوار — مراجعة الاستعلامات: فحص البيانات بقواعد ثابتة + رأي الذكاء الاصطناعي + نموذج قرار (Operations Research)
 // المرحلة credit: بعد بيانات الاستعلام الائتماني. المرحلة visit: بعد الزيارة الميدانية.
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { robustDecide, CLAIMS } from './robust.ts';
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 const out = (s: number, b: unknown) => new Response(JSON.stringify(b), { status: s, headers: { ...CORS, 'Content-Type': 'application/json' } });
 const GOV: Record<string, string> = { '01': 'القاهرة', '02': 'الإسكندرية', '03': 'بورسعيد', '04': 'السويس', '11': 'دمياط', '12': 'الدقهلية', '13': 'الشرقية', '14': 'القليوبية', '15': 'كفر الشيخ', '16': 'الغربية', '17': 'المنوفية', '18': 'البحيرة', '19': 'الإسماعيلية', '21': 'الجيزة', '22': 'بني سويف', '23': 'الفيوم', '24': 'المنيا', '25': 'أسيوط', '26': 'سوهاج', '27': 'قنا', '28': 'أسوان', '29': 'الأقصر', '31': 'البحر الأحمر', '32': 'الوادي الجديد', '33': 'مطروح', '34': 'شمال سيناء', '35': 'جنوب سيناء', '88': 'خارج الجمهورية' };
@@ -140,14 +141,31 @@ Deno.serve(async (req) => {
     // رأي الذكاء الاصطناعي (من غير أسماء ولا أرقام قومية ولا تليفونات)
     const f = i.visit_form || {}, strip = (p: any) => { const { name, phones, landline, ...r } = p || {}; return r; };
     const facts = { المرحلة: stage === 'visit' ? 'بعد الزيارة الميدانية' : 'بعد الاستعلام الائتماني (قبل الزيارة)', السن: K.N.age, النوع: K.N.gender, محافظة_الميلاد: K.N.gov, نوع_النشاط: i.occupation_type, الوظيفة: i.job_title, المهنة_في_البطاقة: i.id_data?.buyer?.job || null, الحالة_الاجتماعية_في_البطاقة: i.id_data?.buyer?.marital_status || null, جهة_العمل: i.employer_name, صافي_الدخل: i.net_income, دورية_الدخل: i.income_freq, الدخل_الشهري: K.inc, التزامات_شهرية: K.obl, القسط_المطلوب: K.inst, نسبة_الالتزام: K.dti != null ? Math.round(K.dti * 100) + '%' : null, السكن: i.housing, سنين_الإقامة: i.residence_years, ضامن_أول: i.guarantor1 ? { القرابة: i.guarantor1.relation } : null, ضامن_ثاني: i.guarantor2 ? { القرابة: i.guarantor2.relation } : null, تاريخ_سابق: hist, ...(stage === 'visit' ? { زيارة: { المشتري: strip(f.b), الضامن_الأول: strip(f.g1), الضامن_الثاني: strip(f.g2), السكن_مطابق: i.visit_verified, العمل_مطابق: i.visit_job_verified, تقرير_المستعلم: i.field_notes, نواقص: i.missing_items } } : {}), الفحوص_الآلية: K.C.map((c: any) => (c.ok === false ? '✗ ' : '✓ ') + c.t) };
-    const prompt = `راجع طلب تقسيط ده بدقة وادي رأيك. البيانات:\n${JSON.stringify(facts)}\n\nرجّع JSON بالمفاتيح دي بالظبط (القيم بالعامية المصرية):\n{"income_estimate":{"min":رقم,"avg":رقم,"max":رقم,"note":"متوسط الدخل الشهري المعتاد بالجنيه لنفس الوظيفة/النشاط في مصر حاليًا ومدى منطقية الدخل المكتوب"},"income_plausible":"منطقي|مبالغ فيه|أقل من المعتاد|مش واضح","consistency":["تناقضات أو بيانات محتاجة تأكيد"],"risk_flags":["نقط خطر"],"positives":["نقط قوة"],"verify_next":["حاجات المستعلم أو الائتمان يتأكد منها"],"opinion":"approve|conditional|reject","confidence":رقم من 0 لـ 100,"summary":"ملخص في 3-4 سطور"}`;
-    const ai: any = await llm(prompt, admin, i.tenant_id);
+    const prompt = `راجع طلب تقسيط ده بدقة وادي رأيك. البيانات:\n${JSON.stringify(facts)}\n\nرجّع JSON بالمفاتيح دي بالظبط (القيم بالعامية المصرية):\n{"income_estimate":{"min":رقم,"avg":رقم,"max":رقم,"note":"متوسط الدخل الشهري المعتاد بالجنيه لنفس الوظيفة/النشاط في مصر حاليًا ومدى منطقية الدخل المكتوب"},"income_plausible":"منطقي|مبالغ فيه|أقل من المعتاد|مش واضح","consistency":["تناقضات أو بيانات محتاجة تأكيد"],"risk_flags":["نقط خطر"],"positives":["نقط قوة"],"verify_next":["حاجات المستعلم أو الائتمان يتأكد منها"],"opinion":"approve|conditional|reject","confidence":رقم من 0 لـ 100,"summary":"ملخص في 3-4 سطور","claims":[{"key":"income|job|employer|residence|housing|obligations|guarantor","prob_true":رقم من 0 لـ 1 (احتمال إن البيان ده حقيقي حسب كل اللي قدامك),"why":"سبب قصير"}]}
+لازم تحط claims للمفاتيح السبعة كلها.`;
+    // رأيين مستقلين: محلل عادي + محلل متشكك. الاختلاف بينهم بيدخل كعدم يقين في السيناريوهات
+    const skeptic = prompt.replace('راجع طلب تقسيط ده بدقة وادي رأيك.', 'انت محلل ائتمان متشكك جدًا ودورك تكتشف أي بيان ممكن يكون مش حقيقي. راجع طلب تقسيط ده.');
+    const [ai, ai2]: any[] = await Promise.all([llm(prompt, admin, i.tenant_id), llm(skeptic, admin, i.tenant_id)]);
+    const cl = (a: any) => { const o: Record<string, any> = {}; (Array.isArray(a?.claims) ? a.claims : []).forEach((c: any) => { const k = String(c.key || '').trim(); if (CLAIMS[k] && c.prob_true != null && !isNaN(+c.prob_true)) o[k] = { p: Math.max(0, Math.min(1, +c.prob_true > 1 ? +c.prob_true / 100 : +c.prob_true)), why: String(c.why || c[' why'] || '').slice(0, 200) }; }); return o; };
+    const C1 = cl(ai), C2 = cl(ai2);
+    const claims = Object.keys(CLAIMS).filter((k) => C1[k] || C2[k]).map((k) => { const a = C1[k], b = C2[k], p = a && b ? (a.p + b.p) / 2 : (a || b).p; return { key: k, label: CLAIMS[k], p: Math.round(p * 100) / 100, u: a && b ? Math.round(Math.abs(a.p - b.p) * 100) / 100 : 0.15, why: (a || b).why }; });
     let pts = K.C.reduce((s: number, c: any) => s + (c.pts || 0), 0);
     if (ai.opinion === 'reject') pts += 15; else if (ai.opinion === 'conditional') pts += 6;
     if (ai.income_plausible === 'مبالغ فيه') pts += 10;
     pts = Math.min(100, pts);
+    const basePts = Math.min(100, K.C.reduce((s: number, c: any) => s + (c.pts || 0), 0));
     const D = decide(pts, K.inc, K.obl, K.inst);
-    const result = { stage, points: pts, decision: D.decision, pd: D.pd, dti_cap: D.cap, max_installment: D.maxInst, requested_installment: K.inst, conditions: D.cond, checks: K.C, ai, at: new Date().toISOString() };
+    let robust: any = null;
+    if (K.inc && K.inst) {
+      const ie = ai.income_estimate || ai2.income_estimate || null;
+      robust = robustDecide({ income: K.inc, obligations: K.obl || 0, inst: K.inst, points: basePts, claims: claims.map((c: any) => ({ key: c.key, p: c.p, u: c.u })), incEst: ie ? { min: num(ie.min) ?? undefined, avg: num(ie.avg) ?? undefined } : null });
+      const ck = robust.chosen.key;
+      D.decision = ck === 'reject' ? 'reject' : ck === 'approve' ? 'approve' : 'conditional';
+      D.cond = ck === 'safe' ? [`تخفيض القسط لـ ${robust.chosen.inst} ج (أقصى قسط آمن)`] : ck === 'cond' ? [`زيادة المقدم بحيث القسط يبقى ${robust.chosen.inst} ج`, 'ضامن إضافي موظف بدخل ثابت'] : ck === 'strict' ? [`القسط ${robust.chosen.inst} ج بحد أقصى`, 'ضامن إضافي موظف بدخل ثابت', 'خطاب مفردات مرتب'] : ck === 'reject' ? [] : [];
+      if (ck === 'reject') D.cond = [];
+      D.pd = Math.round(robust.chosen.pd_mean * 100) || D.pd;
+    }
+    const result = { stage, points: pts, decision: D.decision, pd: D.pd, dti_cap: D.cap, max_installment: D.maxInst, requested_installment: K.inst, conditions: D.cond, checks: K.C, ai, ai2: ai2?.error ? { error: ai2.error } : { opinion: ai2?.opinion, confidence: ai2?.confidence, summary: ai2?.summary, model: ai2?.model }, claims, robust, at: new Date().toISOString() };
     await admin.from('inv_reviews').insert({ tenant_id: i.tenant_id, investigation_id: i.id, stage, decision: D.decision, points: pts, result, created_by: u.user.id });
     return out(200, result);
   } catch (e) { return out(200, { error: String(e) }); }
