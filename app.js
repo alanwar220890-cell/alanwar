@@ -75,7 +75,14 @@ function live(){
  clearInterval(S.pt);S.pt=setInterval(function(){refreshMe();ntLoad()},60000);
  if(!live.b){live.b=1;document.addEventListener('visibilitychange',async function(){if(document.hidden||!S.me)return;if(!(await sessOk())){S.me=null;return loginView('انتهت جلستك، ادخل تاني.')}refreshMe()})}
 }
-function loginView(m){
+// ===== الوضع الليلي / النهاري
+function thCur(){var t=document.documentElement.getAttribute('data-theme');if(t)return t;try{return matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch(e){return 'light'}}
+function thIco(){return thCur()=='dark'?'☀️':'🌙'}
+function thLbl(){return thCur()=='dark'?'الوضع النهاري':'الوضع الليلي'}
+function thToggle(){var t=thCur()=='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',t);try{localStorage.setItem('theme',t)}catch(e){}
+ document.querySelectorAll('.thb').forEach(function(b){b.textContent=thIco();b.title=thLbl();b.setAttribute('aria-label',thLbl())})}
+function thFloat(on){var b=$('#thfl');if(!on){if(b)b.remove();return}if(b)return;b=document.createElement('button');b.id='thfl';b.className='btn thb';b.textContent=thIco();b.title=thLbl();b.setAttribute('aria-label',thLbl());b.onclick=thToggle;document.body.appendChild(b)}
+function loginView(m){setTimeout(function(){thFloat(true)},0);
  APP.innerHTML='<div class="card login"><div class="lg"><img src="logo.png" alt="شعار الأنوار" onerror="this.style.display=\'none\'"><div class="lgt">ALANWAR AI</div><div class="hint">نظام الأنوار لإدارة البيع بالتقسيط</div></div><h2 style="text-align:center">تسجيل الدخول</h2>'+(m?'<p class="hint">'+esc(m)+'</p>':'')+'<label for="em">البريد الإلكتروني</label><input id="em" type="email" autocomplete="username"><label for="pw" style="margin-top:8px">كلمة المرور</label><input id="pw" type="password" autocomplete="current-password"><button class="btn am" id="li" style="margin-top:12px;width:100%">دخول</button><p style="text-align:center;margin:12px 0 0"><a href="#" id="fgt">نسيت كلمة السر؟</a></p></div>';
  $('#fgt').onclick=function(e){e.preventDefault();forgotView($('#em').value.trim())};
  $('#li').onclick=async function(){var em0=$('#em').value.trim(),lk=function(g){return 'الحساب مقفول مؤقتًا بسبب محاولات غلط كتير. جرّب بعد '+(g&&g.until?hrTime(g.until):'شوية')+' أو استخدم «نسيت كلمة السر؟».'};
@@ -113,8 +120,8 @@ function shell(){
  var nav=S.nav.map(function(k){return [k,NV[k]]});
  var br=(S.branchesAll||S.branches).filter(function(b){return b.id==S.me.branch_id})[0];
  var NIC={dash:'chart',cust:'user',con:'note',coll:'cash',leads:'target',inv:'shield',legal:'scale',tgt:'target',task:'task',fin:'chart',camp:'mega',cash:'cash',hr:'clock',ai:'bot',kb:'book',integ:'link',adm:'lock'};S.NV=NV;
- APP.innerHTML='<div class="lay"><nav class="side" aria-label="القائمة الرئيسية"><div class="brand"><span class="logo"><img src="mark.png" alt="شعار الأنوار"></span><div><b>الأنوار</b><small>ALANWAR AI</small></div></div><div class="tabs">'+nav.map(function(t){return '<button data-v="'+t[0]+'">'+pico(NIC[t[0]]||'check')+'<span>'+t[1]+'</span></button>'}).join('')+'</div></nav><div class="mainw"><header class="top2"><div><h1 id="vt">'+esc(NV[S.nav[0]]||'')+'</h1><div class="sub">'+esc(S.me.full_name)+' · '+RL[S.me.role]+(br?'<span class="hbr"> · '+esc(br.name)+'</span>':'')+'</div></div><div class="acts"><button class="btn sm" id="inst" hidden>تثبيت التطبيق</button><button class="btn sm nbell" id="nbell" title="الإشعارات" aria-label="الإشعارات">'+BELL+'<b id="nbc" hidden></b></button><button class="btn sm" id="acc" title="حسابي">حسابي</button><button class="btn sm" id="lo">خروج</button></div></header><main id="v"></main></div></div>';
- $('#lo').onclick=out;$('#acc').onclick=accPanel;$('#nbell').onclick=ntPanel;$('#inst').onclick=instApp;if(S.inst)$('#inst').hidden=false;ntLoad();
+ APP.innerHTML='<div class="lay"><nav class="side" aria-label="القائمة الرئيسية"><div class="brand"><span class="logo"><img src="mark.png" alt="شعار الأنوار"></span><div><b>الأنوار</b><small>ALANWAR AI</small></div></div><div class="tabs">'+nav.map(function(t){return '<button data-v="'+t[0]+'">'+pico(NIC[t[0]]||'check')+'<span>'+t[1]+'</span></button>'}).join('')+'</div></nav><div class="mainw"><header class="top2"><div><h1 id="vt">'+esc(NV[S.nav[0]]||'')+'</h1><div class="sub">'+esc(S.me.full_name)+' · '+RL[S.me.role]+(br?'<span class="hbr"> · '+esc(br.name)+'</span>':'')+'</div></div><div class="acts"><button class="btn sm thb" id="thb" title="'+thLbl()+'" aria-label="'+thLbl()+'">'+thIco()+'</button><button class="btn sm" id="inst" hidden>تثبيت التطبيق</button><button class="btn sm nbell" id="nbell" title="الإشعارات" aria-label="الإشعارات">'+BELL+'<b id="nbc" hidden></b></button><button class="btn sm" id="acc" title="حسابي">حسابي</button><button class="btn sm" id="lo">خروج</button></div></header><main id="v"></main></div></div>';
+ thFloat(false);$('#thb').onclick=thToggle;$('#lo').onclick=out;$('#acc').onclick=accPanel;$('#nbell').onclick=ntPanel;$('#inst').onclick=instApp;if(S.inst)$('#inst').hidden=false;ntLoad();
  if(!S.nav.length)$('#v').innerHTML='<div class="card">لا توجد أقسام متاحة لحسابك حاليًا. اطلب من المدير العام تحديد صلاحياتك.</div>';
  document.querySelectorAll('.tabs button').forEach(function(b){b.onclick=function(){go(b.dataset.v)}})
 }
