@@ -216,7 +216,7 @@ async function vDash0(){
 
 /* ---------- customers ---------- */
 /* ---------- العملاء: عرض من العقود + استيراد/تصدير ---------- */
-var CU_CATS={all:'الكل',active:'نشط (عقد ساري)',late:'متأخر عن السداد',legal:'شؤون قانونية',closed:'منتهي (سدّد بالكامل)',inquiry:'استعلام موافق عليه (لم يستلم)',pending:'عقد قيد الإنشاء',none:'بدون عقد'};
+var CU_CATS={all:'الكل',active:'نشط (عقد ساري)',late:'متأخر عن السداد',legal:'شؤون قانونية',closed:'منتهي (سدّد بالكامل)',inquiry:'استعلام موافق عليه (لم يستلم)',pending:'عقد قيد الإنشاء',none:'بدون عقد',buyer:'مشتري',guarantor:'ضامن'};
 var CU_HEAD=['كود العميل','الاسم','الهاتف','الرقم القومي','العنوان','المنطقة','نوع السكن','الدخل الشهري','الفرع','موافقة تسويق'];
 function cuDig(s){return String(s==null?'':s).replace(/[٠-٩]/g,function(d){return '٠١٢٣٤٥٦٧٨٩'.indexOf(d)}).replace(/[۰-۹]/g,function(d){return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)})}
 function cuNorm(s){return String(s==null?'':s).replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/\s+/g,' ').trim()}
@@ -274,8 +274,8 @@ async function vCust(){
  var ai={};AI.forEach(function(a){ai[a.national_id]=a});
  var rows=C.map(function(c){var ks=kb[c.id]||[],has=function(s){return ks.some(function(k){return k.status==s})};
   var active=has('active'),legal=has('legal'),closed=has('closed')&&!active&&!legal,received=active||legal||has('closed'),pend=!received&&ks.some(function(k){return ['draft','pending_credit','approved'].indexOf(k.status)>=0}),inq=!received&&!!(c.national_id&&ai[c.national_id]);
-  var f={active:active,late:!!late[c.id],legal:legal,closed:closed,inquiry:inq,pending:pend&&!inq,none:!ks.length&&!inq};
-  var lb=legal?'شؤون قانونية':late[c.id]?'متأخر '+late[c.id]+' يومًا':active?'نشط':inq?'استعلام موافق (لم يستلم)':closed?'منتهي':pend?'عقد قيد الإنشاء':'بدون عقد';
+  var f={active:active,late:!!late[c.id],legal:legal,closed:closed,inquiry:inq,pending:pend&&!inq,none:!ks.length&&!inq,buyer:ks.length>0||(c.tags||[]).indexOf('buyer')>=0,guarantor:(c.tags||[]).indexOf('guarantor')>=0};
+  var lb=legal?'شؤون قانونية':late[c.id]?'متأخر '+late[c.id]+' يومًا':active?'نشط':inq?'استعلام موافق (لم يستلم)':closed?'منتهي':pend?'عقد قيد الإنشاء':(c.tags||[]).indexOf('guarantor')>=0?'ضامن':'بدون عقد';if(f.guarantor&&ks.length)lb+=' · ضامن كمان';
   var code=c.customer_code||(ks.filter(function(k){return k.code})[0]||{}).code||'';
   var st=CS[c.id]||null,dealing=active||legal,last=dealing?today:closed&&st&&st.closed_last_due?st.closed_last_due:inq&&ai[c.national_id]&&ai[c.national_id].decided_at?String(ai[c.national_id].decided_at).slice(0,10):st&&st.last_due?st.last_due:null;
   var rate=!st||!st.contracts?'':(legal||(late[c.id]||0)>30||st.deferrals>st.defer_allowance)?'weak':st.deferrals==0&&!late[c.id]?'top':'good';
@@ -460,6 +460,62 @@ function kDate(x){x=cuDig(x).trim().replace(/\./g,'/');if(!x)return '';var m=x.m
  if(m){y=+m[1];mo=+m[2];d=+m[3]}else{m=x.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);if(!m)return null;d=+m[1];mo=+m[2];y=+m[3]}
  var t=new Date(Date.UTC(y,mo-1,d));if(t.getUTCFullYear()!=y||t.getUTCMonth()!=mo-1||t.getUTCDate()!=d)return null;return t.toISOString().slice(0,10)}
 function kNum(x){x=cuDig(x).replace(/[,\s٬]/g,'').replace(/[^0-9.\-]/g,'');return x===''?null:+x}
+
+// ===== تصوير بيعة أو استعلام قديم من الموبايل وتسجيله في البرنامج
+var PH={imgs:[],r:null,kind:'contract'};
+function phCard(){return '<details class="card" id="phc"><summary><b>📷 تصوير بيعة أو استعلام قديم (من الورق)</b></summary><p class="hint">صوّر العقد وإيصالات الأمانة والكمبيالات وكارت التحصيل وصور البطايق (لحد 6 صور لنفس البيعة). الذكاء الاصطناعي بيقرا البيانات وبيملا الفورم، وانت بتراجع وتعدّل قبل الحفظ. العقد بيتسجل في العقود بجدول أقساطه، والمشتري والضامنين بيتسجلوا في العملاء بتصنيف «مشتري» و«ضامن».</p>'+
+ '<div class="f"><div><label for="phk">نوع الورق</label><select id="phk"><option value="contract">بيعة (عقد حالي أو منتهي)</option><option value="inquiry">استعلام قديم ملغي أو مرفوض</option></select></div></div>'+
+ '<div class="pay"><label class="btn am">📷 صوّر<input type="file" accept="image/*" capture="environment" id="phcam" hidden></label><label class="btn">🖼 من الصور<input type="file" accept="image/*" multiple id="phgal" hidden></label><button class="btn" id="phrun" disabled>اقرا البيانات</button><button class="btn sm" id="phclr">مسح الصور</button></div><div id="phth" class="pay" style="gap:6px"></div><div id="phres"></div></details>'}
+function phThumbs(){var b=$('#phth');if(!b)return;b.innerHTML=PH.imgs.map(function(x,i){return '<span style="position:relative;display:inline-block"><img src="data:'+x.mime+';base64,'+x.b64+'" alt="صورة '+(i+1)+'" style="height:70px;border-radius:6px;border:1px solid var(--ln)"><button class="btn sm" data-phx="'+i+'" style="position:absolute;top:-6px;left:-6px;min-height:0;padding:0 6px">×</button></span>'}).join('')+(PH.imgs.length?'<span class="hint">'+PH.imgs.length+' / 6</span>':'');var r=$('#phrun');if(r)r.disabled=!PH.imgs.length}
+async function phAdd(files){for(var i=0;i<files.length&&PH.imgs.length<6;i++){try{var f=await prepFile(files[i],1800);if(/pdf/i.test(f.type||''))continue;var b64=await new Promise(function(ok,no){var r=new FileReader();r.onload=function(){ok(String(r.result).split(',')[1])};r.onerror=no;r.readAsDataURL(f)});PH.imgs.push({b64:b64,mime:f.type&&/^image\/(jpeg|png|webp)$/.test(f.type)?f.type:'image/jpeg',file:f})}catch(e){msg(e.message||'تعذّر قراءة الصورة',1)}}phThumbs()}
+function phIn(id,lb,v,typ,extra){return '<div><label for="'+id+'">'+lb+'</label><input id="'+id+'"'+(typ?' type="'+typ+'"':'')+' value="'+esc(v==null?'':v)+'"'+(extra||'')+'></div>'}
+function phSel(id,lb,L,v,ph){return '<div><label for="'+id+'">'+lb+'</label><select id="'+id+'">'+(ph!=null?'<option value="">'+ph+'</option>':'')+L.map(function(o){return '<option value="'+esc(o[0])+'"'+(o[0]==v?' selected':'')+'>'+esc(o[1])+'</option>'}).join('')+'</select></div>'}
+function phFind(L,name,key){var n=cuNorm(name||'');if(!n)return '';var m=L.filter(function(x){var a=cuNorm(x[key]);return a==n||a.indexOf(n)>=0||n.indexOf(a)>=0})[0];return m?m.id:''}
+function phPerson(p,pre,t,rel){p=p||{};return '<h3 style="margin:12px 0 4px">'+t+'</h3><div class="f">'+phIn(pre+'n','الاسم',p.name)+phIn(pre+'i','الرقم القومي',p.national_id,'text',' inputmode="numeric" maxlength="14"')+phIn(pre+'p','الهاتف',p.phone,'tel')+phIn(pre+'a','العنوان',p.address)+phIn(pre+'ia','عنوان البطاقة',p.id_address)+(rel?'<div><label for="'+pre+'r">صلة القرابة</label><input id="'+pre+'r" list="phrel" value="'+esc(p.relation||'')+'"></div>':'')+'</div>'}
+function phForm(r){var K=r.kind=='inquiry',sl=staffList(),hsk=(r.housing||'').indexOf('تمليك')>=0?'owned':(r.housing||'').indexOf('جديد')>=0?'new_rent':(r.housing||'').indexOf('ايجار')>=0||(r.housing||'').indexOf('إيجار')>=0?'old_rent':'';
+ var brId=phFind(brList(),r.branch,'name')||S.me.branch_id||'',seller=phFind(sl,r.seller,'full_name'),prod=(S.products||[]).filter(function(x){return cuNorm(x.name)==cuNorm(r.product||'')})[0];
+ var warn=(r.warnings||[]).concat((r.unclear||[]).map(function(u){return 'مش واضح: '+u}));
+ var h='<div class="alert '+(warn.length?'bad':'ok')+'">'+(r.confidence!=null?'ثقة القراءة: <b>'+r.confidence+'%</b>. ':'')+'راجع كل الخانات وصلّح أي حاجة قبل الحفظ.'+(warn.length?'<br>'+warn.map(esc).join('<br>'):'')+'</div><datalist id="phrel">'+REL.map(function(x){return '<option value="'+x+'">'}).join('')+'</datalist>';
+ h+='<div class="f">'+phSel('phb','الفرع',brList().map(function(b){return [b.id,b.name]}),brId,pickBr()?'اختر':null)+(K?phIn('phd','تاريخ الطلب',r.date,'date')+phSel('phst','حالة الاستعلام',[['cancelled','ملغي'],['rejected','مرفوض']],r.status)+phIn('phrs','سبب الإلغاء / الرفض',r.reason):
+  phIn('phcode','كود العقد',r.contract_code)+phIn('phd','تاريخ العقد',r.contract_date,'date')+phSel('phsl','موظف المبيعات',sl.map(function(p){return [p.id,p.full_name]}),seller||S.me.id)+phSel('phas','الموظف المسؤول (المحصل)',sl.map(function(p){return [p.id,p.full_name]}),'','بدون'))+'</div>';
+ h+=phPerson(r.buyer,'phbu','👤 المشتري')+'<div class="f">'+phSel('phhs','نوع السكن',[['owned','تمليك'],['old_rent','إيجار قديم'],['new_rent','إيجار جديد']],hsk,'—')+phSel('phz','المنطقة',(S.zones||[]).map(function(z){return [z.id,z.name]}),phFind(S.zones||[],(r.buyer||{}).address,'name'),'—')+phIn('phinc',K?'الدخل الشهري':'الدخل الشهري',K?r.net_income:r.monthly_income,'number')+(K?phIn('phbd','تاريخ الميلاد',r.birth_date||(r.buyer||{}).birth_date,'date')+phIn('phjob','الوظيفة',(r.buyer||{}).job)+phIn('phemp','جهة العمل',(r.buyer||{}).employer):'')+'</div>';
+ if(!K){var pr=r.price!=null?r.price:r.price_calc;
+  h+='<h3 style="margin:12px 0 4px">🧾 البيعة</h3><div class="f"><div><label for="php">المنتج</label><input id="php" list="phpl" value="'+esc(prod?prod.name:r.product||'')+'"><datalist id="phpl">'+(S.products||[]).map(function(x){return '<option value="'+esc(x.name)+'">'}).join('')+'</datalist></div>'+phIn('phpr','سعر المنتج (إجمالي البيع)',pr,'number')+phIn('phdn','المقدم',r.down_payment,'number')+phIn('phm','المدة (شهور)',r.months,'number')+phIn('phin','قيمة القسط',r.installment,'number')+phIn('phrt','الفائدة السنوية %',r.annual_rate!=null?r.annual_rate:prod?prod.annual_rate:'','number')+phIn('phfd','تاريخ أول قسط',r.first_due_date,'date')+phIn('phpd','المسدد من الأقساط لحد النهارده',r.paid_amount,'number')+'</div>'+(r.price==null&&r.price_calc?'<p class="hint">السعر مش مكتوب في الورق، فاتحسب من (القسط × المدة + المقدم). راجعه.</p>':'')+'<div class="pay"><button class="btn sm" id="phall">البيعة منتهية (المسدد = كل الأقساط)</button></div>';
+ }else h+='<div class="f">'+phIn('phpr','المنتج المطلوب',r.product)+phIn('phin','القسط المطلوب',r.new_installment,'number')+'</div>';
+ h+=phPerson(r.guarantor1,'phg1','🤝 الضامن الأول',1)+phPerson(r.guarantor2,'phg2','🤝 الضامن الثاني (اختياري)',1);
+ h+=phIn('phnt','ملاحظات',r.notes)+(K?'':'<label style="display:flex;gap:6px;align-items:center;margin-top:8px"><input type="checkbox" id="phkeep" checked style="width:auto"> احفظ صور الورق مع العقد في المستندات</label>')+'<div class="pay"><button class="btn am" id="phsave">'+(K?'حفظ الاستعلام':'حفظ العقد')+'</button></div>';
+ return h}
+function phV(id){var e=$('#'+id);return e?String(e.value||'').trim():''}
+function phP(pre){var o={name:phV(pre+'n').replace(/\s+/g,' '),national_id:cuDig(phV(pre+'i')).replace(/\D/g,''),phone:cuDig(phV(pre+'p')).replace(/\D/g,''),address:phV(pre+'a'),id_address:phV(pre+'ia')};var r=$('#'+pre+'r');if(r)o.relation=r.value.trim();return o}
+async function phSave(btn){var K=PH.kind=='inquiry',bu=phP('phbu'),g1=phP('phg1'),g2=phP('phg2'),er=[];
+ if(!bu.name)er.push('اسم المشتري');if(!/^\d{14}$/.test(bu.national_id)&&(K||!phV('phcode')))er.push('رقم قومي المشتري (14 رقم)');
+ [g1,g2].forEach(function(g,i){if(g.national_id&&!/^\d{14}$/.test(g.national_id))er.push('رقم قومي الضامن '+(i+1))});
+ if(bu.name&&cuWords(bu.name)<4)er.push('اسم المشتري لازم 4 كلمات على الأقل');
+ var br=phV('phb');if(!br)er.push('الفرع');if(er.length)return msg('راجع: '+er.join('، '),1);
+ var sg=[g1,g2].filter(function(g){return g.name&&cuWords(g.name)<4}).length;if(!K&&sg&&!confirm('اسم ضامن أقل من 4 كلمات، فمش هيتسجل في العملاء كـ«ضامن» (هيتحفظ في العقد بس). تكمل؟'))return;
+ btn.disabled=true;var x;
+ if(K){x=await sb.rpc('inv_import',{p:{branch_id:br,customer_name:bu.name,customer_phone:bu.phone||null,customer_address:bu.address||null,address_details:bu.id_address||null,national_id:bu.national_id,birth_date:phV('phbd')||null,housing:phV('phhs')||null,employer_name:phV('phemp')||null,job_title:phV('phjob')||null,net_income:phV('phinc')||null,new_installment:phV('phin')||null,
+   guarantor1:g1.name?g1:{},guarantor2:g2.name?g2:{},status:phV('phst')||'cancelled',reason:[phV('phrs'),phV('phpr')?'المنتج: '+phV('phpr'):'',phV('phnt')].filter(Boolean).join(' — ')||null,date:phV('phd')||null}})}
+ else{var pn=phV('php'),pr=(S.products||[]).filter(function(q){return cuNorm(q.name)==cuNorm(pn)})[0];
+  var o={national_id:bu.national_id||null,customer_code:phV('phcode')||null,full_name:bu.name,phone:bu.phone||null,address:bu.address||null,id_address:bu.id_address||null,zone_id:phV('phz')||null,housing:phV('phhs')||null,monthly_income:phV('phinc')||null,branch_id:br,
+   product_id:pr?pr.id:null,product_name:pn||null,price:phV('phpr')||null,down_payment:phV('phdn')||0,months:phV('phm')||null,installment:phV('phin')||null,annual_rate:phV('phrt')||0,start_date:phV('phd')||null,first_due_date:phV('phfd')||null,paid_amount:phV('phpd')||0,
+   seller_id:phV('phsl')||null,assigned_to:phV('phas')||null,notes:phV('phnt')||null,
+   g_name:g1.name||null,g_relation:g1.relation||null,g_phone:g1.phone||null,g_nid:g1.national_id||null,g_address:g1.address||null,g_id_address:g1.id_address||null,
+   g2_name:g2.name||null,g2_relation:g2.relation||null,g2_phone:g2.phone||null,g2_nid:g2.national_id||null,g2_address:g2.address||null};
+  if(!(+o.price>0))er.push('سعر المنتج');if(!(+o.months>=1))er.push('المدة');if(!o.start_date)er.push('تاريخ العقد');if(er.length){btn.disabled=false;return msg('راجع: '+er.join('، '),1)}
+  x=await sb.rpc('contract_import',{p:o});
+  if(!x.error&&$('#phkeep')&&$('#phkeep').checked&&x.data&&x.data.id){var kid=x.data.id;for(var i=0;i<PH.imgs.length;i++){try{var f=PH.imgs[i].file,path=S.me.tenant_id+'/contracts/'+kid+'/'+Date.now()+'-'+i+'.jpg',u=await sb.storage.from('inv-docs').upload(path,f,{contentType:PH.imgs[i].mime});if(!u.error)await sb.from('contract_docs').insert({contract_id:kid,doc_type:'other',file_path:path,file_name:'صورة الورق '+(i+1)+'.jpg'})}catch(e){}}}}
+ btn.disabled=false;if(x.error)return msg(em(x.error),1);
+ PH={imgs:[],r:null,kind:PH.kind};msg(K?'اتسجل الاستعلام القديم ✓':'اتسجل العقد والعميل والضامنين ✓');return true}
+async function phClick(t){if(t.id=='phclr'){PH.imgs=[];PH.r=null;phThumbs();$('#phres').innerHTML='';return true}
+ var x0=t.getAttribute&&t.getAttribute('data-phx');if(x0!=null){PH.imgs.splice(+x0,1);phThumbs();return true}
+ if(t.id=='phall'){var a=+phV('phin'),m=+phV('phm');if(a&&m){$('#phpd').value=Math.round(a*m*100)/100}else msg('اكتب القسط والمدة الأول',1);return true}
+ if(t.id=='phrun'){PH.kind=$('#phk').value;t.disabled=true;$('#phres').innerHTML='<p class="hint">⏳ الذكاء الاصطناعي بيقرا الصور… ممكن ياخد لحد دقيقة.</p>';
+  var x=await sb.functions.invoke('doc-ocr',{body:{kind:PH.kind,images:PH.imgs.map(function(i){return {b64:i.b64,mime:i.mime}})}}),er=await fnErr(x),r=x.data||{};t.disabled=false;
+  if(er||r.error){$('#phres').innerHTML='<div class="alert bad">'+esc(er||r.error)+'</div>';return true}
+  PH.r=r;$('#phres').innerHTML=phForm(r);return true}
+ if(t.id=='phsave'){if(await phSave(t)){$('#phres').innerHTML='<div class="alert ok">اتحفظ ✓ تقدر تصوّر البيعة اللي بعدها.</div>';phThumbs();if(PH.kind=='contract')setTimeout(function(){vCon()},1200)}return true}
+ return false}
 function conTemplate(){var b0=(brList()[0]||{}).name||'',e0=xlStaff()[0]||'',p0=(S.products||[])[0],T=function(i){return {w:i,text:true}};
  dlx('قالب-استيراد-العقود.xlsx',XL.template({head:KT,
   cols:[T(14),{w:28},T(18),T(15),{w:32},{w:28},{w:16},{w:14},{w:12},{w:12},{w:20},{w:22},{w:24},{w:24},{w:12},{w:11},{w:11},{w:11},{w:13},T(13),T(13),{w:14},{w:24},{w:13},T(15),T(18),{w:28},{w:28},{w:24},{w:16},T(15),T(18),{w:28},{w:30}],
@@ -481,7 +537,7 @@ async function vCon(){
   '<h3>شروط التقسيط</h3><div class="f"><div><label for="kd">المقدم</label><input id="kd" type="number" min="0" value="0"></div><div><label for="km">المدة (أشهر)</label><input id="km" type="number" min="1" max="60" value="12"></div><div><label for="ka">الفائدة السنوية %</label><input id="ka" type="number" step="0.1" value="0"></div><div><label for="kt">طريقة الحساب</label><select id="kt"><option value="flat">ثابتة على الأصل</option><option value="reducing">متناقصة</option></select></div><div><label for="kst">تاريخ العقد / استلام المنتج</label><input id="kst" type="date"></div><div><label for="kfd">تاريخ أول قسط</label><input id="kfd" type="date"></div>'+(adm2?'<div><label for="kinst">قيمة القسط (للعقد القديم، يدوي)</label><input id="kinst" type="number" min="0" placeholder="اتركه فارغًا للحساب التلقائي"></div>':'')+'</div>'+(adm2?'<div style="margin-top:6px"><label><input type="checkbox" id="kclosed"> عقد منتهي (سُدّد بالكامل)</label></div>':'')+
   '<p class="hint" id="kv"></p><div class="wrap" id="ksch"></div><label for="kn" style="margin-top:8px">ملاحظات البيعة</label><textarea id="kn" rows="3"></textarea><div class="pay"><button class="btn am" id="ks">حفظ وتفعيل العقد</button></div></div>':'';
  var kq=CF.q.trim().toLowerCase(),sf=CF.st,L=K.filter(function(c){var cu0=c.customers||{};return(!sf||c.status==sf)&&(!kq||((cu0.full_name||'')+' '+(cu0.phone||'')+' '+(c.code||'')+' '+(c.product_name||'')).toLowerCase().indexOf(kq)>=0)});
- var kimp=can('con.import')||can('con.view')?'<details class="card"><summary><b>استيراد وتصدير العقود</b></summary><div class="pay"><button class="btn" id="kex">تصدير العقود (CSV)</button>'+(can('con.import')?'<button class="btn" id="kx0">تنزيل قالب الاستيراد</button>':'')+'</div>'+(can('con.import')?'<ol class="hint"><li>نزّل القالب واملأه بالعقود الحالية، أو صدّر الشيت القديم بنفس العناوين.</li><li>ارفع ملف Excel (xlsx) زي ما هو، أو CSV. من جوجل شيت: ملف ← تنزيل ← Microsoft Excel. أو الصق الخلايا.</li><li>الشيت فيه موظف المبيعات والموظف المسؤول (المحصل) لكل عقد، فكل بيعة بتنزل للموظف بتاعها.</li><li>دوس «فحص» تراجع النتيجة، وبعدين «استيراد». العقود بتتسجل سارية بجدول أقساطها، والمسدد بيتوزع على الأقساط.</li></ol><div class="pay"><input type="file" id="kfile" accept=".xlsx,.csv,.txt,.tsv" aria-label="ملف Excel أو CSV">'+'</div><div class="f" style="margin-top:6px"><div><label for="kib">الفرع الافتراضي (للعقود اللي من غير فرع)</label><select id="kib">'+opts(brList(),'id','name',S.me.branch_id||'',pickBr()?'اختر':'')+'</select></div></div><label for="kpaste" style="margin-top:8px">أو الصق البيانات هنا</label><textarea id="kpaste" rows="4"></textarea><div class="pay"><button class="btn" id="kchk">فحص</button><button class="btn am" id="kgo" disabled>استيراد</button></div><div id="kres"></div>':'')+'</details>':'';
+ var kimp=(can('con.import')?phCard():'')+(can('con.import')||can('con.view')?'<details class="card"><summary><b>استيراد وتصدير العقود</b></summary><div class="pay"><button class="btn" id="kex">تصدير العقود (CSV)</button>'+(can('con.import')?'<button class="btn" id="kx0">تنزيل قالب الاستيراد</button>':'')+'</div>'+(can('con.import')?'<ol class="hint"><li>نزّل القالب واملأه بالعقود الحالية، أو صدّر الشيت القديم بنفس العناوين.</li><li>ارفع ملف Excel (xlsx) زي ما هو، أو CSV. من جوجل شيت: ملف ← تنزيل ← Microsoft Excel. أو الصق الخلايا.</li><li>الشيت فيه موظف المبيعات والموظف المسؤول (المحصل) لكل عقد، فكل بيعة بتنزل للموظف بتاعها.</li><li>دوس «فحص» تراجع النتيجة، وبعدين «استيراد». العقود بتتسجل سارية بجدول أقساطها، والمسدد بيتوزع على الأقساط.</li></ol><div class="pay"><input type="file" id="kfile" accept=".xlsx,.csv,.txt,.tsv" aria-label="ملف Excel أو CSV">'+'</div><div class="f" style="margin-top:6px"><div><label for="kib">الفرع الافتراضي (للعقود اللي من غير فرع)</label><select id="kib">'+opts(brList(),'id','name',S.me.branch_id||'',pickBr()?'اختر':'')+'</select></div></div><label for="kpaste" style="margin-top:8px">أو الصق البيانات هنا</label><textarea id="kpaste" rows="4"></textarea><div class="pay"><button class="btn" id="kchk">فحص</button><button class="btn am" id="kgo" disabled>استيراد</button></div><div id="kres"></div>':'')+'</details>':'');
  v.innerHTML='<div id="cdet"></div>'+form+kimp+'<div class="card"><h2>العقود ('+L.length+')</h2><div class="f"><div><label for="fq2">بحث</label><input id="fq2" value="'+esc(CF.q)+'" placeholder="عميل أو كود أو منتج"></div><div><label for="fs2">الحالة</label><select id="fs2"><option value="">الكل</option>'+Object.keys(ST).map(function(k){return '<option value="'+k+'"'+(k==sf?' selected':'')+'>'+ST[k]+'</option>'}).join('')+'</select></div></div><div class="wrap"><table><tr><th>الكود</th><th>العميل</th><th>المنتج</th><th>الإجمالي</th><th>القسط</th><th>المدة</th><th>الحالة</th><th></th></tr>'+L.slice(0,200).map(function(c){
   var a='<button class="btn sm" data-f="'+c.id+'">ملف العقد</button> ';
   if(c.status=='draft'&&canNew)a+='<button class="btn sm am" data-act="'+c.id+'">تفعيل</button> ';
@@ -513,6 +569,8 @@ async function vCon(){
   if(['kr','kd','km','ka','kinst'].indexOf(t.id)>=0)sch()};
  v.onchange=function(e){var t=e.target;
   if(t.id=='kfile'&&t.files[0]){readImport(t.files[0],function(x){$('#kpaste').value=x;$('#kchk').click()});return}
+  if((t.id=='phcam'||t.id=='phgal')&&t.files.length){phAdd(Array.prototype.slice.call(t.files)).then(function(){t.value=''});return}
+  if(t.id=='phk'){PH.kind=t.value;return}
   if(t.id=='fs2'){CF.st=t.value;vCon()}
   if(['kt','kst','kfd'].indexOf(t.id)>=0)sch();
   if(t.id=='kp'){var p=S.products.filter(function(x){return x.id==t.value})[0];if(p){$('#ka').value=p.annual_rate;sch()}}
@@ -524,6 +582,7 @@ async function vCon(){
  v.onclick=async function(e){var t=e.target,a;
   if((a=t.getAttribute('data-f')))return conPopup(a,vCon);
   if(t.id=='kx0')return conTemplate();
+  if(t.closest&&t.closest('#phc')&&await phClick(t))return;
   if(t.id=='kex'){t.disabled=true;try{var IN=await cuAll(function(){return sb.from('installments').select('contract_id,amount,paid')}),PD={};IN.forEach(function(x){PD[x.contract_id]=(PD[x.contract_id]||0)+ +x.paid});
    var EL=L.length?L:K;if(!EL.length)return msg('لا توجد عقود للتصدير',1);
    var head=KHEAD.concat(['إجمالي الأقساط','المتبقي','الحالة']);
