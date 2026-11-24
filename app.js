@@ -599,7 +599,7 @@ async function conPopup(id,after){
   if((a=t.getAttribute('data-dopen'))){e.preventDefault();viewDoc(a);return}
   if(t.getAttribute('data-prn'))return doPrint('<div class="cfile">'+conFile(d,false).replace(/<a [^>]*>([^<]*)<\/a>/g,'$1')+'</div>');
   if((a=t.getAttribute('data-crm'))){e.preventDefault();if(!confirm('حذف المستند؟'))return;var dx=await sb.from('contract_docs').delete().eq('id',a);if(dx.error)return msg(em(dx.error),1);await sb.storage.from('inv-docs').remove([t.getAttribute('data-crp')]);return conPopup(id,after)}
-  if(t.getAttribute('data-cup')){var cf=m.querySelector('#cdf').files[0];if(!cf)return msg('اختر ملفًا',1);if(cf.size>10485760)return msg('الحد الأقصى 10 ميجا',1);
+  if(t.getAttribute('data-cup')){var cf=m.querySelector('#cdf').files[0];if(!cf)return msg('اختر ملفًا',1);msg('بيجهز الملف…');try{cf=await prepFile(cf)}catch(er){return msg(er.message||em(er),1)}
    var ex=((cf.name.match(/\.([a-zA-Z0-9]{1,5})$/)||[])[1]||'bin').toLowerCase(),cp2=S.me.tenant_id+'/c/'+c.id+'/'+Date.now()+'_'+Math.random().toString(36).slice(2,8)+'.'+ex;
    t.disabled=true;var u2=await sb.storage.from('inv-docs').upload(cp2,cf,{contentType:cf.type||undefined});if(u2.error){t.disabled=false;return msg(em(u2.error),1)}
    var i2=await sb.from('contract_docs').insert({contract_id:c.id,doc_type:m.querySelector('#cdt').value,file_path:cp2,file_name:cf.name});t.disabled=false;
@@ -914,7 +914,7 @@ async function vInv(){
   var miss=DREQ.filter(function(k){return !d.some(function(x){return x.doc_type==k})});
   var h='<div class="hint" style="margin-top:8px">المستندات: '+(d.length?d.map(function(x){return '<a href="#" data-open="'+esc(x.file_path)+'">'+esc(DT[x.doc_type])+'</a>'+(canD&&IDP[x.doc_type]&&(i.status=='documents'||i.inv_type=='verify')&&!/\.pdf$/i.test(x.file_path)?' <a href="#" data-ocr="'+esc(x.file_path)+'" data-oci="'+i.id+'" title="قراءة البيانات من البطاقة">📇</a>':'')+(canD&&x.uploaded_by==S.me.id?' <a href="#" data-rmd="'+x.id+'" data-rmp="'+esc(x.file_path)+'" style="color:var(--rd)">×</a>':'')}).join(' · '):'لا يوجد')+'</div>'+(i.status=='documents'&&miss.length?'<div class="hint" style="color:var(--rd)">مطلوب قبل الإرسال للزيارة: '+miss.map(function(k){return DT[k]}).join('، ')+'. باقي المستندات اختيارية.</div>':'');
   if(canD){var ty=i.status=='visit'?Object.keys(DT):Object.keys(DT).filter(function(k){return k!='visit_photo'});
-   h+=(i.status=='visit'?'<div class="hint">تقدر ترفق صور الزيارة وأي مستند ناقص لاستكمال الأوراق.</div>':'')+'<div class="pay"><select id="dt'+i.id+'" aria-label="نوع المستند">'+dtOpts(ty)+'</select><input type="file" id="df'+i.id+'" accept="image/*,application/pdf" aria-label="الملف"><button class="btn" data-up="'+i.id+'">رفع</button></div>'}
+   h+=(i.status=='visit'?'<div class="hint">تقدر ترفق صور الزيارة وأي مستند ناقص لاستكمال الأوراق.</div>':'')+'<div class="pay"><select id="dt'+i.id+'" aria-label="نوع المستند">'+dtOpts(ty)+'</select><input type="file" id="df'+i.id+'" accept="image/*,application/pdf" aria-label="الملف"><label class="btn" style="cursor:pointer">📷 صوّر وارفع<input type="file" accept="image/*" capture="environment" data-cap="'+i.id+'" hidden></label><button class="btn" data-up="'+i.id+'">رفع</button></div>'}
   return h}
  function card(i){
   var act=ACT.indexOf(i.status)>=0,lt=act&&i.due_date&&i.due_date<today,op=open[i.id]?' open':'';
@@ -953,17 +953,20 @@ async function vInv(){
  v.innerHTML='<div class="k"><div><b>'+L.length+'</b><span>إجمالي الطلبات</span></div><div><b>'+(st.documents||0)+'</b><span>مرحلة المستندات</span></div><div><b>'+(st.visit||0)+'</b><span>مرحلة الزيارة</span></div><div><b>'+(st.credit_review||0)+'</b><span>مراجعة الائتمان</span></div><div><b>'+late+'</b><span>متأخرة</span></div></div>'+form+
   '<div class="card"><label for="fl">تصفية بالمرحلة</label><select id="fl"><option value="">الكل</option>'+Object.keys(IS).map(function(k){var o='<option value="'+k+'"'+(k==flt?' selected':'')+'>'+IS[k]+' ('+(st[k]||0)+')</option>';if(k=='approved')o+=[['approved_done','موافق عليه — تم التسليم'],['approved_wait','موافق عليه — لم يستلم']].map(function(x){return '<option value="'+x[0]+'"'+(x[0]==flt?' selected':'')+'>'+x[1]+' ('+(st[x[0]]||0)+')</option>'}).join('');return o}).join('')+'</select></div>'+(shown.length?shown.map(card).join(''):'<div class="card hint">لا توجد طلبات.</div>');
  v.ontoggle=null;v.querySelectorAll('details.card').forEach(function(d){d.ontoggle=function(){S.invOpen=S.invOpen||{};S.invOpen[d.dataset.id]=d.open}});
- v.onchange=function(e){if(e.target.id=='fl'){S.invFlt=e.target.value;vInv()}};
+ var invUpload=async function(a,f0,btn){var f;if(btn)btn.disabled=true;msg('بيجهز الملف ويرفعه…');
+   try{f=await prepFile(f0)}catch(er){if(btn)btn.disabled=false;return msg(er.message||em(er),1)}
+   var inv=L.filter(function(x){return x.id==a})[0],ext=((String(f.name||'').match(/\.([a-zA-Z0-9]{1,5})$/)||[])[1]||(/jpeg/.test(f.type)?'jpg':'bin')).toLowerCase(),path=inv.tenant_id+'/'+a+'/'+Date.now()+'_'+Math.random().toString(36).slice(2,8)+'.'+ext;
+   var ct=f.type||(isHeic(f)?'image/heic':undefined);
+   var up=await sb.storage.from('inv-docs').upload(path,f,{contentType:ct});if(up.error){if(btn)btn.disabled=false;return msg('الرفع فشل: '+em(up.error),1)}
+   var dty=$('#dt'+a).value,ins=await sb.from('investigation_docs').insert({investigation_id:a,doc_type:dty,file_path:path,file_name:f.name||f0.name});
+   if(ins.error){await sb.storage.from('inv-docs').remove([path]);if(btn)btn.disabled=false;return msg(em(ins.error),1)}msg('تم رفع المستند ✓');
+   var ocr=IDP[dty]&&/^image\//.test(ct||'')&&!!$('#a_nm'+a);S.invOpen=S.invOpen||{};S.invOpen[a]=1;await vInv();if(ocr)idRun(a,path)};
+ v.onchange=async function(e){if(e.target.id=='fl'){S.invFlt=e.target.value;return vInv()}var a=e.target.getAttribute&&e.target.getAttribute('data-cap');if(!a)return;var f0=e.target.files&&e.target.files[0];e.target.value='';if(f0)await invUpload(a,f0,null)};
  var go2=function(a,o,ok){return upd('investigations',a,o,vInv)};
  v.onclick=async function(e){var t=e.target,a;
   if((a=t.getAttribute('data-open'))){e.preventDefault();viewDoc(a);return}
   if((a=t.getAttribute('data-rmd'))){e.preventDefault();if(!confirm('حذف المستند؟'))return;var rp=t.getAttribute('data-rmp'),d=await sb.from('investigation_docs').delete().eq('id',a);if(d.error)return msg(em(d.error),1);await sb.storage.from('inv-docs').remove([rp]);return vInv()}
-  if((a=t.getAttribute('data-up'))){var f=$('#df'+a).files[0];if(!f)return msg('اختر ملفًا',1);if(f.size>10485760)return msg('الحد الأقصى 10 ميجا',1);
-   var inv=L.filter(function(x){return x.id==a})[0],ext=((f.name.match(/\.([a-zA-Z0-9]{1,5})$/)||[])[1]||'bin').toLowerCase(),path=inv.tenant_id+'/'+a+'/'+Date.now()+'_'+Math.random().toString(36).slice(2,8)+'.'+ext;
-   var up=await sb.storage.from('inv-docs').upload(path,f,{contentType:f.type||undefined});if(up.error)return msg(em(up.error),1);
-   var dty=$('#dt'+a).value,ins=await sb.from('investigation_docs').insert({investigation_id:a,doc_type:dty,file_path:path,file_name:f.name});
-   if(ins.error){await sb.storage.from('inv-docs').remove([path]);return msg(em(ins.error),1)}msg('تم رفع المستند');
-   var ocr=IDP[dty]&&/^image\//.test(f.type||'')&&!!$('#a_nm'+a);S.invOpen=S.invOpen||{};S.invOpen[a]=1;await vInv();if(ocr)idRun(a,path);return}
+  if((a=t.getAttribute('data-up'))){var f0=$('#df'+a).files[0];if(!f0)return msg('اختر ملفًا أو صوّر',1);return invUpload(a,f0,t)}
   if((a=t.getAttribute('data-ocr'))){e.preventDefault();return idRun(t.getAttribute('data-oci'),a)}
   if((a=t.getAttribute('data-ocx'))){delete S.idOcr[a][t.getAttribute('data-ocw')];return idPaint(a)}
   if((a=t.getAttribute('data-oca'))){var ow=t.getAttribute('data-ocw'),oo=idApply(a,ow);if(!oo)return;delete S.idOcr[a][ow];return go2(a,oo)}
@@ -994,6 +997,26 @@ async function vInv(){
    if(ix.error)return msg(em(ix.error),1);msg('تم تسجيل الطلب في مرحلة المستندات');vInv()}}
 }
 
+/* ---------- تجهيز الصور قبل الرفع: تحويل HEIC وأي صورة لـ JPEG وتصغير الكبير ---------- */
+function isHeic(f){return /heic|heif/i.test(f.type||'')||/\.(heic|heif)$/i.test(f.name||'')}
+function loadHeic2any(){return window.heic2any?Promise.resolve(window.heic2any):new Promise(function(res,rej){var sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';sc.onload=function(){window.heic2any?res(window.heic2any):rej(new Error('heic2any'))};sc.onerror=function(){rej(new Error('تعذر تحميل محوّل HEIC'))};document.head.appendChild(sc)})}
+async function decodeImg(blob){
+ if(window.createImageBitmap){try{return await createImageBitmap(blob,{imageOrientation:'from-image'})}catch(e){}}
+ return await new Promise(function(res,rej){var u=URL.createObjectURL(blob),im=new Image();im.onload=function(){URL.revokeObjectURL(u);res(im)};im.onerror=function(){URL.revokeObjectURL(u);rej(new Error('decode'))};im.src=u})}
+async function prepFile(f,max){max=max||2000;
+ var pdf=/pdf/i.test(f.type||'')||/\.pdf$/i.test(f.name||'');
+ if(pdf){if(f.size>10485760)throw new Error('ملف الـ PDF أكبر من 10 ميجا');return f}
+ var looksImg=/^image\//.test(f.type||'')||isHeic(f)||/\.(jpe?g|png|webp|gif|bmp)$/i.test(f.name||'')||!f.type;
+ if(!looksImg)throw new Error('نوع الملف ده مش مدعوم — ارفع صورة أو PDF');
+ var src=f,img=null;
+ try{img=await decodeImg(src)}catch(e){img=null}
+ if(!img&&isHeic(f)){try{var h=await loadHeic2any(),out=await h({blob:f,toType:'image/jpeg',quality:0.9});src=Array.isArray(out)?out[0]:out;img=await decodeImg(src)}catch(e){img=null}}
+ if(!img){if(f.size>10485760)throw new Error('الصورة أكبر من 10 ميجا ومش قادر أصغّرها على الجهاز ده');return f}
+ var w=img.width,hh=img.height,k=Math.min(1,max/Math.max(w,hh)),cv=document.createElement('canvas');cv.width=Math.round(w*k);cv.height=Math.round(hh*k);
+ var cx=cv.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,cv.width,cv.height);cx.drawImage(img,0,0,cv.width,cv.height);try{img.close&&img.close()}catch(e){}
+ var jb=await new Promise(function(res){cv.toBlob(res,'image/jpeg',0.85)});if(!jb)return f;
+ var nm=String(f.name||'photo').replace(/\.[a-z0-9]{1,5}$/i,'')+'.jpg';
+ try{return new File([jb],nm,{type:'image/jpeg'})}catch(e){jb.name=nm;return jb}}
 /* ---------- قراءة البطاقة الشخصية آليًا (وجه/ظهر) للمشتري والضامنين ---------- */
 var IDP={id_front:['buyer','front'],id_back:['buyer','back'],guarantor_id:['g1','front'],guarantor_id_back:['g1','back'],guarantor2_id:['g2','front'],guarantor2_id_back:['g2','back']};
 var IDW={buyer:'المشتري',g1:'الضامن الأول',g2:'الضامن الثاني'};
