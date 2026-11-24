@@ -2,7 +2,9 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 const out = (s: number, b: unknown) => new Response(JSON.stringify(b), { status: s, headers: { ...CORS, 'Content-Type': 'application/json' } });
-const KINDS = ['customer', 'contract', 'investigation', 'lead', 'legal_only', 'renew'];
+const KINDS = ['customer', 'contract', 'investigation', 'lead', 'legal_only', 'renew', 'task', 'cash_entry', 'attendance', 'penalty', 'target', 'decision'];
+const SECTIONS = ['tasks', 'attendance', 'payroll', 'cash', 'targets', 'leads', 'ai', 'notifications', 'customers'];
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 Deno.serve(async (req) => {
@@ -19,20 +21,23 @@ Deno.serve(async (req) => {
     if (mok !== true) return out(403, { error: 'ادخل بالتحقق بخطوتين الأول' });
     const body = await req.json().catch(() => ({}));
     const kind = String(body.kind || ''), ids = Array.isArray(body.ids) ? body.ids.filter((x: any) => UUID.test(String(x))) : [];
-    if (!KINDS.includes(kind)) return out(400, { error: 'نوع الحذف غير معروف' });
-    if (!ids.length) return out(400, { error: 'مفيش حاجة متحددة للحذف' });
+    const section = body.section ? String(body.section) : '';
+    if (section) { if (!SECTIONS.includes(section)) return out(400, { error: 'القسم غير معروف' }); }
+    else { if (!KINDS.includes(kind)) return out(400, { error: 'نوع الحذف غير معروف' }); if (!ids.length) return out(400, { error: 'مفيش حاجة متحددة للحذف' }); }
     if (!body.password) return out(400, { error: 'اكتب كلمة السر' });
     // التأكد من كلمة السر بتسجيل دخول منفصل
     const chk = createClient(url, anon, { auth: { persistSession: false, autoRefreshToken: false } });
     const { data: si, error: se } = await chk.auth.signInWithPassword({ email: u.user.email, password: String(body.password) });
     if (se || si?.user?.id !== u.user.id) return out(403, { error: 'كلمة السر غلط' });
     try { await chk.auth.signOut({ scope: 'local' }); } catch (_) { /**/ }
-    const { data, error } = await admin.rpc('purge_records', { p_tenant: me.tenant_id, p_actor: me.id, p_kind: kind, p_ids: ids, p_reason: body.reason || null });
+    const { data, error } = section
+      ? await admin.rpc('purge_section', { p_tenant: me.tenant_id, p_actor: me.id, p_section: section, p_from: DAY.test(body.from || '') ? body.from : null, p_to: DAY.test(body.to || '') ? body.to : null, p_reason: body.reason || null })
+      : await admin.rpc('purge_records', { p_tenant: me.tenant_id, p_actor: me.id, p_kind: kind, p_ids: ids, p_reason: body.reason || null });
     if (error) return out(400, { error: error.message });
     const files: string[] = (data?.files || []).filter(Boolean);
     for (let i = 0; i < files.length; i += 100) { try { await admin.storage.from('inv-docs').remove(files.slice(i, i + 100)); } catch (_) { /**/ } }
     const nd = data?.deleted || 0;
-    if (nd >= 20 || kind === 'customer') { try { await admin.rpc('sec_notify_admins', { t: me.tenant_id, ttl: 'تنبيه حذف بيانات', body: `اتحذف ${nd} (${kind}) بواسطة المدير العام${body.reason ? ' — السبب: ' + String(body.reason).slice(0, 200) : ''}` }); } catch (_) { /**/ } }
+    if (nd >= 20 || kind === 'customer' || section) { try { await admin.rpc('sec_notify_admins', { t: me.tenant_id, ttl: 'تنبيه حذف بيانات', body: `اتحذف ${nd} (${section ? 'مسح قسم ' + section : kind}) بواسطة المدير العام${body.reason ? ' — السبب: ' + String(body.reason).slice(0, 200) : ''}` }); } catch (_) { /**/ } }
     return out(200, { deleted: data?.deleted || 0, files: files.length });
   } catch (e) { return out(500, { error: String((e as Error).message || e) }); }
 });
