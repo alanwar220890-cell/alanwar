@@ -71,7 +71,7 @@ async function refreshMe(){
  if(old!==S.sig){var cur=S.cur;shell();go(S.nav.indexOf(cur)>=0?cur:S.nav[0]);msg('تم تحديث صلاحياتك')}
 }
 function live(){
- try{if(S.ch)sb.removeChannel(S.ch);S.ch=sb.channel('me-'+S.me.id).on('postgres_changes',{event:'UPDATE',schema:'public',table:'profiles',filter:'id=eq.'+S.me.id},function(){refreshMe()}).on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'user_id=eq.'+S.me.id},function(p){NT.last=p.new&&p.new.created_at||NT.last;ntNew(p.new)}).subscribe();ntPoll()}catch(e){}
+ try{if(S.ch)sb.removeChannel(S.ch);S.ch=sb.channel('me-'+S.me.id).on('postgres_changes',{event:'UPDATE',schema:'public',table:'profiles',filter:'id=eq.'+S.me.id},function(){refreshMe()}).on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'user_id=eq.'+S.me.id},function(p){NT.last=p.new&&p.new.created_at||NT.last;ntNew(p.new)}).subscribe();ntPoll();setTimeout(pushBar,1500)}catch(e){}
  clearInterval(S.pt);S.pt=setInterval(function(){refreshMe();ntLoad()},60000);
  if(!live.b){live.b=1;document.addEventListener('visibilitychange',async function(){if(document.hidden||!S.me)return;if(!(await sessOk())){S.me=null;return loginView('انتهت جلستك، ادخل تاني.')}refreshMe()})}
 }
@@ -105,7 +105,7 @@ function recoverView(){
   if(r.error){var m=String(r.error.message||'');return msg(/different|same/i.test(m)?'كلمة السر الجديدة لازم تكون مختلفة عن القديمة':/weak|short|characters/i.test(m)?'كلمة السر ضعيفة، خليها أطول وفيها حروف وأرقام':/session|expired|jwt/i.test(m)?'اللينك انتهت صلاحيته. اطلب لينك جديد':'مقدرناش نحفظ: '+m,1)}
   history.replaceState(null,'',location.pathname);S.recShown=0;msg('تم تغيير كلمة السر بنجاح');boot()}
 }
-async function out(){try{if(S.ch)sb.removeChannel(S.ch)}catch(e){}clearInterval(S.pt);clearInterval(S.idleT);try{await sb.auth.signOut({scope:'local'})}catch(e){}S.me=null;if(S.idleOut){S.idleOut=0;return loginView('اتعمل خروج تلقائي لأنك ماستخدمتش البرنامج فترة. ادخل تاني.')}boot()}
+async function out(){try{if(S.ch)sb.removeChannel(S.ch)}catch(e){}try{if(pushOk()&&!S.idleOut){var rg=await navigator.serviceWorker.getRegistration(),sbs=rg&&await rg.pushManager.getSubscription();if(sbs){await sb.rpc('push_sub_del',{p_endpoint:sbs.endpoint});await sbs.unsubscribe()}}}catch(e){}clearInterval(S.pt);clearInterval(S.idleT);try{await sb.auth.signOut({scope:'local'})}catch(e){}S.me=null;if(S.idleOut){S.idleOut=0;return loginView('اتعمل خروج تلقائي لأنك ماستخدمتش البرنامج فترة. ادخل تاني.')}boot()}
 function shell(){
  var NV={dash:'لوحة التحكم',cust:'العملاء',con:'العقود',coll:'التحصيل',leads:'المبيعات',inv:'الاستعلامات',legal:'الشؤون القانونية والقضايا',tgt:'المستهدفات',task:'المهام',fin:'المالية والأداء',camp:'التسويق',cash:'الخزنة',hr:'الحضور والرواتب',ai:'المساعد الذكي',kb:'مركز المعرفة',integ:'الربط',adm:'الإدارة'};
  var NP={dash:['dash.view'],cust:['cust.view','cust.edit','cust.import'],con:['con.view','con.create','con.send_credit','con.credit','con.final','con.import'],coll:['coll.view','coll.pay'],leads:['leads.view','leads.edit','leads.assign'],inv:['inv.view','inv.create','inv.assign','inv.visit','inv.credit','inv.cancel'],legal:['legal.view','legal.work','legal.status','legal.reassign'],tgt:['tgt.view','tgt.edit'],task:['task.view','task.assign'],fin:['fin.view','fin.edit'],camp:['camp.manage','camp.follow'],cash:['cash.view','cash.entry','cash.close'],ai:['ai.view'],hr:['hr.self','hr.view','hr.manage','hr.payroll'],kb:['kb.manage'],integ:['integ.manage']};
@@ -1541,7 +1541,7 @@ async function vCash(){
 }
 /* ---------- الإشعارات ---------- */
 var BELL='<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>';
-async function ntLoad(){try{var r=await sb.from('notifications').select('id',{count:'exact',head:true}).is('read_at',null);var c=r.count||0,b=$('#nbc');if(b){b.textContent=c>99?'99+':c||'';b.hidden=!c}}catch(e){}}
+async function ntLoad(){try{var r=await sb.from('notifications').select('id',{count:'exact',head:true}).is('read_at',null);var c=r.count||0,b=$('#nbc');try{if(navigator.setAppBadge){if(c)navigator.setAppBadge(c);else navigator.clearAppBadge()}}catch(_){}if(b){b.textContent=c>99?'99+':c||'';b.hidden=!c}}catch(e){}}
 var NT={snd:function(){try{return localStorage.getItem('ntSnd')!=='0'}catch(e){return true}},ctx:null,seen:{}};
 function ntUnlock(){try{if(!NT.ctx){var A=window.AudioContext||window.webkitAudioContext;if(A)NT.ctx=new A()}if(NT.ctx&&NT.ctx.state=='suspended')NT.ctx.resume()}catch(e){}}
 ['pointerdown','keydown','touchstart'].forEach(function(ev){document.addEventListener(ev,ntUnlock,{passive:true})});
@@ -1551,6 +1551,32 @@ function ntDevice(x){try{if(!('Notification' in window)||Notification.permission
  if(navigator.serviceWorker&&navigator.serviceWorker.getRegistration)navigator.serviceWorker.getRegistration().then(function(r){if(r)r.showNotification(x.title,o);else new Notification(x.title,o)});else new Notification(x.title,o)}catch(e){}}
 function ntNew(x){if(x&&x.id){if(NT.seen[x.id])return;NT.seen[x.id]=1}ntLoad();if(!x||!x.title)return;ntBeep();ntDevice(x);msg('🔔 '+x.title+(x.body?' — '+x.body:''))}
 // احتياطي لو الاتصال المباشر وقع: كل دقيقة نشوف لو فيه إشعار جديد
+
+// ===== إشعارات Push (بتوصل والبرنامج مقفول)
+function pushOk(){return 'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window&&location.protocol=='https:'}
+function isIOS(){return /iP(hone|ad|od)/.test(navigator.userAgent)}
+function isStandalone(){try{return matchMedia('(display-mode: standalone)').matches||navigator.standalone}catch(e){return false}}
+function b64u(s){var p='='.repeat((4-s.length%4)%4),b=atob((s+p).replace(/-/g,'+').replace(/_/g,'/')),a=new Uint8Array(b.length);for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a}
+async function pushSub(ask){if(!pushOk())return false;try{
+  if(Notification.permission!='granted'){if(!ask)return false;var pr=await Notification.requestPermission();if(pr!='granted')return false}
+  var reg=await navigator.serviceWorker.register('sw.js');await navigator.serviceWorker.ready;
+  var sub=await reg.pushManager.getSubscription();
+  if(!sub){var k=await sb.functions.invoke('push-send',{body:{action:'key'}});if(!k.data||!k.data.key)return false;sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(k.data.key)})}
+  var j=sub.toJSON();var r=await sb.rpc('push_sub_save',{p_endpoint:j.endpoint,p_p256dh:j.keys.p256dh,p_auth:j.keys.auth,p_ua:navigator.userAgent});return !r.error}catch(e){return false}}
+async function pushBar(){var old=$('#pushbar');if(old)old.remove();if(!S.me)return;
+ var later=0;try{later=+localStorage.getItem('pushLater')||0}catch(e){}
+ if(pushOk()&&Notification.permission=='granted'){pushSub(false);return}
+ if(Date.now()<later)return;
+ var msgT,btn='';
+ if(isIOS()&&!isStandalone())msgT='علشان الإشعارات توصلك على الآيفون والبرنامج مقفول: افتح الموقع من Safari ← زرار المشاركة ⬆️ ← «إضافة إلى الشاشة الرئيسية»، وافتح البرنامج من الأيقونة وفعّل الإشعارات.';
+ else if(!pushOk())return;
+ else if(Notification.permission=='denied')msgT='الإشعارات مقفولة للموقع ده من إعدادات المتصفح. افتحها من إعدادات الموقع (القفل 🔒 جنب العنوان ← الإشعارات ← سماح) علشان المهام والتذكيرات توصلك.';
+ else{msgT='فعّل الإشعارات علشان المهام والتذكيرات وتحديثات الاستعلامات توصلك بصوت حتى والبرنامج مقفول.';btn='<button class="btn sm am" id="pushon">🔔 تفعيل الإشعارات</button>'}
+ var d=document.createElement('div');d.id='pushbar';d.className='alert';d.style.cssText='margin:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+ d.innerHTML='<span style="flex:1;min-width:200px">'+msgT+'</span>'+btn+'<button class="btn sm" id="pushlater">بعدين</button>';
+ var v=$('#v');if(!v)return;v.parentNode.insertBefore(d,v);
+ d.onclick=async function(e){if(e.target.id=='pushlater'){try{localStorage.setItem('pushLater',Date.now()+3*864e5)}catch(_){}d.remove()}
+  if(e.target.id=='pushon'){e.target.disabled=true;ntUnlock();var ok=await pushSub(true);if(ok){d.remove();msg('اتفعّلت الإشعارات ✓ هتوصلك حتى والبرنامج مقفول');ntBeep()}else{e.target.disabled=false;msg('مقدرناش نفعّل الإشعارات. اتأكد إنك وافقت على الإذن',1)}}}}
 function ntPoll(){clearInterval(NT.pt);NT.last=new Date().toISOString();NT.pt=setInterval(async function(){if(!S.me)return clearInterval(NT.pt);try{var r=await sb.from('notifications').select('*').gt('created_at',NT.last).order('created_at').limit(5);(r.data||[]).forEach(function(x){NT.last=x.created_at;ntNew(x)})}catch(e){}},60000)}
 try{navigator.serviceWorker&&navigator.serviceWorker.addEventListener('message',function(e){var v=e.data&&e.data.ntGo;if(v&&S.nav&&S.nav.indexOf(v)>=0)go(v)})}catch(e){}
 function ntAgo(ts){var s=(Date.now()-new Date(ts))/1000;return s<60?'دلوقتي':s<3600?'من '+Math.floor(s/60)+' دقيقة':s<86400?'من '+Math.floor(s/3600)+' ساعة':fd(ldate(ts))}
@@ -1561,7 +1587,7 @@ async function ntPanel(){var old=$('#ntm');if(old){old.remove();return}var r=awa
  m.onclick=async function(e){if(e.target==m||e.target.id=='ntx')return m.remove();
   if(e.target.id=='ntsnd'){try{localStorage.setItem('ntSnd',NT.snd()?'0':'1')}catch(_){}e.target.textContent=NT.snd()?'🔊 الصوت شغال':'🔇 الصوت مقفول';if(NT.snd())ntBeep();return}
   if(e.target.id=='nttest'){ntUnlock();var sv=NT.snd;NT.snd=function(){return true};ntBeep();NT.snd=sv;return}
-  if(e.target.id=='ntdev'){try{var pr=await Notification.requestPermission();if(pr=='granted'){e.target.remove();msg('اتفعّلت إشعارات الجهاز ✓')}else msg('الإذن اترفض. فعّله من إعدادات المتصفح للموقع ده',1)}catch(_){msg('المتصفح ده مش بيدعم إشعارات الجهاز',1)}return}if(e.target.id=='ntall'){await sb.from('notifications').update({read_at:new Date().toISOString()}).is('read_at',null);m.remove();return ntLoad()}
+  if(e.target.id=='ntdev'){var okp=await pushSub(true);if(okp){e.target.remove();msg('اتفعّلت الإشعارات ✓ هتوصلك حتى والبرنامج مقفول');var pb=$('#pushbar');if(pb)pb.remove()}else msg(isIOS()&&!isStandalone()?'على الآيفون لازم تضيف البرنامج للشاشة الرئيسية الأول وتفتحه من الأيقونة':'الإذن اترفض أو المتصفح مش بيدعم. فعّله من إعدادات الموقع',1);return}if(e.target.id=='ntall'){await sb.from('notifications').update({read_at:new Date().toISOString()}).is('read_at',null);m.remove();return ntLoad()}
   var it=e.target.closest('[data-nt]');if(!it)return;await sb.from('notifications').update({read_at:new Date().toISOString()}).eq('id',it.getAttribute('data-nt')).is('read_at',null);m.remove();ntLoad();var vw=it.getAttribute('data-nv');if(vw&&S.nav.indexOf(vw)>=0)go(vw)}}
 /* ---------- إيصال واتساب بعد التحصيل ---------- */
 async function payWA(cid,am,dt){try{var r=await Promise.all([sb.from('contracts').select('code,product_name,customers(full_name,phone)').eq('id',cid).single(),sb.from('installments').select('amount,paid,due_date').eq('contract_id',cid)]);
