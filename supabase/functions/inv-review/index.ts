@@ -167,6 +167,9 @@ Deno.serve(async (req) => {
     }
     const result = { stage, points: pts, decision: D.decision, pd: D.pd, dti_cap: D.cap, max_installment: D.maxInst, requested_installment: K.inst, conditions: D.cond, checks: K.C, ai, ai2: ai2?.error ? { error: ai2.error } : { opinion: ai2?.opinion, confidence: ai2?.confidence, summary: ai2?.summary, model: ai2?.model }, claims, robust, at: new Date().toISOString() };
     await admin.from('inv_reviews').insert({ tenant_id: i.tenant_id, investigation_id: i.id, stage, decision: D.decision, points: pts, result, created_by: u.user.id });
+    // لو المدير العام قفل ظهور القرار للوظيفة دي في المرحلة دي: بيتحفظ بس ما بيرجعش للموظف
+    const { data: canSee } = await db.rpc('inv_ai_can', { p_stage: stage });
+    if (canSee === false) return out(200, { hidden: true, stage });
     return out(200, result);
   } catch (e) { return out(200, { error: String(e) }); }
 });
