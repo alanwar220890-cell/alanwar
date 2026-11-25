@@ -22,7 +22,25 @@ function nid(n: string) {
   r.gender = +n[12] % 2 ? 'ذكر' : 'أنثى'; r.ok = true; return r;
 }
 
-async function vision(imgs: { b64: string; mime: string }[], PROMPT: string, admin: any, tenant: string) {
+const MC: { t: number; fast: string[]; strong: string[] } = { t: 0, fast: [], strong: [] };
+// تقييم جودة القراءة من 100: الخانات الأساسية موجودة والأرقام منطقية
+function quality(r: any, kind: string) {
+  let q = 100; const b = r?.buyer || {}, n = dig(b.national_id).replace(/\D/g, '');
+  if (!clean(b.name)) q -= 35; else if (String(b.name).trim().split(/\s+/).length < 3) q -= 10;
+  if (n && !nid(n).ok) q -= 25; else if (!n) q -= 10;
+  const ph = dig(b.phone).replace(/\D/g, ''); if (ph && !/^0?1[0125]\d{8}$/.test(ph)) q -= 5;
+  if (kind === 'contract') {
+    if (!isoDate(r.contract_date)) q -= 10;
+    const P = num(r.price), D = num(r.down_payment) || 0, I = num(r.installment), M = num(r.months);
+    if (!I || !M) q -= 20; else if (M > 72 || M < 1) q -= 15;
+    if (P && I && M && Math.abs(D + I * M - P) / P > 0.6) q -= 10;
+    if (!clean(r.product)) q -= 5;
+  }
+  const c = r?.confidence != null ? +r.confidence : null; if (c != null && c < 70) q -= 15;
+  if (Array.isArray(r?.unclear)) q -= Math.min(15, r.unclear.length * 3);
+  return Math.max(0, q);
+}
+async function vision(imgs: { b64: string; mime: string }[], PROMPT: string, admin: any, tenant: string, kind: string) {
   const okey = Deno.env.get('OPENAI_API_KEY'), gkey = Deno.env.get('GEMINI_API_KEY');
   if (!okey && !gkey) return { error: 'لسه مفيش مفتاح ذكاء اصطناعي (GEMINI_API_KEY) في Supabase' };
   const { data: row } = await admin.from('app_settings').select('value').eq('tenant_id', tenant).eq('key', 'ai_config').maybeSingle();
@@ -31,7 +49,9 @@ async function vision(imgs: { b64: string; mime: string }[], PROMPT: string, adm
   const key = prov === 'openai' ? okey! : gkey!;
   const url = prov === 'openai' ? 'https://api.openai.com/v1/chat/completions' : 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
   let models = [(prov === 'openai' ? c.model : c.gemini_model) || (prov === 'openai' ? 'gpt-5.4-mini' : 'gemini-3.8-flash')];
-  if (prov === 'gemini') { try { const l = await (await fetch('https://generativelanguage.googleapis.com/v1beta/openai/models', { headers: { Authorization: `Bearer ${key}` } })).json(); const all = (l?.data || []).map((x: any) => String(x.id).replace(/^models\//, '')).filter((x: string) => /^gemini/.test(x) && !/image|tts|audio|live|embed|preview|exp|thinking/.test(x)); const v = (x: string) => parseFloat((x.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || '0'); all.sort((a: string, b: string) => v(b) - v(a)); const fl = all.filter((x: string) => /flash/.test(x)), pro = all.filter((x: string) => /pro/.test(x)), pv = (l?.data || []).map((x: any) => String(x.id).replace(/^models\//, '')).filter((x: string) => /^gemini/.test(x) && /flash/.test(x) && /preview|latest/.test(x) && !/image|tts|audio|live|embed/.test(x)); models = [...new Set([...models, ...fl.slice(0, 8), ...pv.slice(0, 3), ...pro.slice(0, 2)])]; } catch (_) { /**/ } }
+  let fast: string[] = models, strong: string[] = [];
+  if (prov === 'gemini' && MC.t > Date.now() - 600000) { fast = [...new Set([...models, ...MC.fast])]; strong = MC.strong; }
+  else if (prov === 'gemini') { try { const l = await (await fetch('https://generativelanguage.googleapis.com/v1beta/openai/models', { headers: { Authorization: `Bearer ${key}` } })).json(); const all = (l?.data || []).map((x: any) => String(x.id).replace(/^models\//, '')).filter((x: string) => /^gemini/.test(x) && !/image|tts|audio|live|embed|preview|exp|thinking/.test(x)); const v = (x: string) => parseFloat((x.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || '0'); all.sort((a: string, b: string) => v(b) - v(a)); const fl = all.filter((x: string) => /flash/.test(x)), pro = all.filter((x: string) => /pro/.test(x)), pv = (l?.data || []).map((x: any) => String(x.id).replace(/^models\//, '')).filter((x: string) => /^gemini/.test(x) && /flash/.test(x) && /preview|latest/.test(x) && !/image|tts|audio|live|embed/.test(x)); MC.fast = [...new Set([...fl.slice(0, 6), ...pv.slice(0, 2)])]; MC.strong = pro.slice(0, 2); MC.t = Date.now(); fast = [...new Set([...models, ...MC.fast])]; strong = MC.strong; } catch (_) { /**/ } }
   let last = '', busy = 0; const t0 = Date.now();
   const one = async (m: string, ac: AbortController) => {
     const body: any = { model: m, messages: [{ role: 'system', content: 'انت نظام OCR دقيق جدًا لمستندات شركات البيع بالتقسيط في مصر (عقود، إيصالات أمانة، كمبيالات، استمارات استعلام، صور بطايق). رد بـ JSON بس.' }, { role: 'user', content: [{ type: 'text', text: PROMPT }, ...imgs.map((i) => ({ type: 'image_url', image_url: { url: `data:${i.mime};base64,${i.b64}` } }))] }], response_format: { type: 'json_object' } };
@@ -44,17 +64,27 @@ async function vision(imgs: { b64: string; mime: string }[], PROMPT: string, adm
     admin.from('ai_usage').insert({ tenant_id: tenant, user_id: null, model: prov + ':' + m + ':doc', prompt_tokens: j.usage?.prompt_tokens || 0, completion_tokens: j.usage?.completion_tokens || 0 }).then(() => {}, () => {});
     return { model: m, ...parsed };
   };
-  // بنبعت لـ 3 موديلات مختلفة في نفس الوقت وأول واحد يرد صح بناخده ونلغي الباقي — أسرع وأقل تأثرًا بالزحمة
-  const W = prov === 'openai' ? 1 : 3;
-  for (let round = 0; round < 3 && Date.now() - t0 < 100000; round++) {
-    for (let k = 0; k < models.length && Date.now() - t0 < 100000; k += W) {
-      const grp = models.slice(k, k + W), ac = new AbortController();
-      try { const res = await Promise.any(grp.map((m) => one(m, ac))); ac.abort(); return res; }
-      catch (e: any) { const errs = (e?.errors || [e]).map((x: any) => String(x?.message || x)); last = errs[errs.length - 1] || last;
-        if (errs.length && errs.every((x: string) => !/demand|overload|unavailable|503|429|500|not found|no longer|quota|exhausted|deadline|internal|JSON|Unexpected/i.test(x)) && prov === 'openai') return { error: last }; }
+  // مرحلة 1: موديلين سريعين مع بعض وأول رد صح بناخده. لو النتيجة ضعيفة (خانات مهمة ناقصة أو أرقام مش منطقية) → مرحلة 2 بموديل أقوى
+  const race = async (list: string[], W: number, rounds: number, budget: number) => {
+    for (let round = 0; round < rounds && Date.now() - t0 < budget; round++) {
+      for (let k = 0; k < list.length && Date.now() - t0 < budget; k += W) {
+        const grp = list.slice(k, k + W), ac = new AbortController();
+        try { const res = await Promise.any(grp.map((m) => one(m, ac))); ac.abort(); return res; }
+        catch (e: any) { const errs = (e?.errors || [e]).map((x: any) => String(x?.message || x)); last = errs[errs.length - 1] || last;
+          if (prov === 'openai' && errs.every((x: string) => !/demand|overload|unavailable|503|429|500|quota|deadline|internal|JSON|Unexpected/i.test(x))) return null; }
+      }
+      if (round < rounds - 1) await new Promise((z) => setTimeout(z, 1500 * (round + 1)));
     }
-    await new Promise((z) => setTimeout(z, 2000 * (round + 1)));
-  }
+    return null;
+  };
+  const W = prov === 'openai' ? 1 : 2;
+  const r1: any = await race(fast, W, 3, strong.length ? 70000 : 100000);
+  const q1 = r1 ? quality(r1, kind) : -1;
+  if (r1 && (q1 >= 80 || !strong.length || Date.now() - t0 > 75000)) return { ...r1, stage: 1, q: q1, ms: Date.now() - t0 };
+  const r2: any = strong.length ? await race(strong, 2, 1, 110000) : null;
+  const q2 = r2 ? quality(r2, kind) : -1;
+  if (r2 && q2 >= q1) return { ...r2, stage: 2, q: q2, ms: Date.now() - t0 };
+  if (r1) return { ...r1, stage: 1, q: q1, ms: Date.now() - t0 };
   return { error: busy ? 'BUSY' : last };
 }
 
@@ -98,10 +128,10 @@ Deno.serve(async (req) => {
     if (!imgs.length) return out(400, { error: 'صوّر البيعة الأول' });
     if (imgs.reduce((s: number, i: any) => s + i.b64.length, 0) > 18_000_000) return out(400, { error: 'الصور كبيرة جدًا، قلّل عددها' });
     const PS = '__P__', PJ = '__PJ__';
-    const r: any = await vision(imgs, (kind === 'inquiry' ? PI : PC).split(PS).join(PJ).replace(/__PJ__/g, '{"name":"الاسم كامل","national_id":"14 رقم","phone":"موبايل 11 رقم","address":"العنوان","id_address":"عنوان البطاقة لو مكتوب","relation":"صلة القرابة بالمشتري (للضامن)","job":"المهنة","employer":"جهة العمل"}'), admin, me!.tenant_id);
+    const r: any = await vision(imgs, (kind === 'inquiry' ? PI : PC).split(PS).join(PJ).replace(/__PJ__/g, '{"name":"الاسم كامل","national_id":"14 رقم","phone":"موبايل 11 رقم","address":"العنوان","id_address":"عنوان البطاقة لو مكتوب","relation":"صلة القرابة بالمشتري (للضامن)","job":"المهنة","employer":"جهة العمل"}'), admin, me!.tenant_id, kind);
     if (r.error) return out(200, r.error === 'BUSY' ? { error: 'خدمة الذكاء الاصطناعي عليها ضغط كبير دلوقتي ومش فاضية. جرّب تاني بعد دقيقتين.', busy: true } : { error: 'الذكاء الاصطناعي ما قدرش يقرا الصور: ' + r.error });
     const warn: string[] = [];
-    const res: any = { kind, model: r.model, confidence: r.confidence != null ? +r.confidence : null, unclear: Array.isArray(r.unclear) ? r.unclear.map(clean).filter(Boolean).slice(0, 15) : [], notes: clean(r.notes), branch: clean(r.branch),
+    const res: any = { kind, model: r.model, stage: r.stage, quality: r.q, ms: r.ms, confidence: r.confidence != null ? +r.confidence : null, unclear: Array.isArray(r.unclear) ? r.unclear.map(clean).filter(Boolean).slice(0, 15) : [], notes: clean(r.notes), branch: clean(r.branch),
       buyer: person(r.buyer, warn, 'المشتري'), guarantor1: person(r.guarantor1, warn, 'الضامن الأول'), guarantor2: person(r.guarantor2, warn, 'الضامن الثاني'), housing: clean(r.housing) };
     if (kind === 'contract') Object.assign(res, { contract_code: clean(r.contract_code), contract_date: isoDate(r.contract_date), seller: clean(r.seller), monthly_income: num(r.monthly_income), product: clean(r.product),
       price: num(r.price), down_payment: num(r.down_payment), months: num(r.months), installment: num(r.installment), first_due_date: isoDate(r.first_due_date), annual_rate: num(r.annual_rate),
