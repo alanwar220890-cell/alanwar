@@ -64,5 +64,26 @@ Deno.serve(async (req) => {
     await log(c.user!.id, 'CREATE_USER', { email, full_name: name, role: b.role, branch_id: b.branch_id });
     return out(200, { ok: true, id: c.user!.id });
   }
+  if (b.action === 'delete') {
+    // حذف حساب موظف: لازم كلمة سر المدير العام
+    if (!b.admin_password) return out(400, { error: 'اكتب كلمة السر بتاعتك' });
+    const chk = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, { auth: { persistSession: false, autoRefreshToken: false } });
+    const { data: si, error: se } = await chk.auth.signInWithPassword({ email: who.user.email!, password: String(b.admin_password) });
+    if (se || si?.user?.id !== me.id) return out(403, { error: 'كلمة السر غلط' });
+    try { await chk.auth.signOut({ scope: 'local' }); } catch (_) { /**/ }
+    const { data: r, error } = await admin.rpc('user_delete', { p_tenant: me.tenant_id, p_actor: me.id, p_user: String(b.user_id || ''), p_to: b.transfer_to || null, p_reason: b.reason ? String(b.reason).slice(0, 300) : null });
+    if (error) return out(400, { error: error.message });
+    const id = String(b.user_id);
+    if (r?.hard) {
+      // مالوش أي شغل مسجل: يتمسح نهائي
+      const { error: de } = await admin.auth.admin.deleteUser(id);
+      if (de) await admin.auth.admin.updateUserById(id, { ban_duration: '876000h' });
+    } else {
+      // ليه شغل مسجل: الحساب يتقفل ويفضل اسمه في السجلات، والإيميل يتحرر علشان ينفع يتستخدم تاني
+      await admin.auth.admin.updateUserById(id, { ban_duration: '876000h', email: `deleted-${id.slice(0, 8)}-${Date.now()}@deleted.invalid`, email_confirm: true });
+    }
+    try { await admin.rpc('sec_notify_admins', { t: me.tenant_id, ttl: 'تم حذف حساب موظف', body: `اتحذف حساب «${r?.name || ''}» بواسطة المدير العام${b.reason ? ' — السبب: ' + String(b.reason).slice(0, 200) : ''}` }); } catch (_) { /**/ }
+    return out(200, { ok: true, ...r });
+  }
   return out(400, { error: 'إجراء غير معروف' });
 });
