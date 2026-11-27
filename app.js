@@ -464,8 +464,19 @@ async function conLoad(id){
  var cd=(await sb.from('contract_docs').select('id,doc_type,file_path,uploaded_by,created_at').eq('contract_id',id).order('created_at')).data||[];
  return{c:c,ins:r[0].data||[],py:r[1].data||[],inv:inv,docs:docs,al:al,cdocs:cd}}
 function prStandalone(){try{return window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}catch(e){return false}}
+function prOverlay(html){var o=document.createElement('div');o.id='prov';o.style.cssText='position:fixed;inset:0;z-index:60;background:#fff;color:#000;overflow:auto;-webkit-overflow-scrolling:touch';
+ o.innerHTML='<div style="position:sticky;top:0;display:flex;gap:8px;flex-wrap:wrap;padding:8px;background:#f3f4f6;border-bottom:1px solid #ddd;z-index:2"><button class="btn" data-prx="back">↩ رجوع</button><button class="btn am" data-prx="print">🖨 طباعة / حفظ PDF</button>'+(navigator.share?'<button class="btn" data-prx="share">📤 مشاركة الملف</button>':'')+'<button class="btn" data-prx="open">🌐 افتح في المتصفح</button></div><div style="padding:8px">'+html+'</div>';
+ document.body.appendChild(o);var hs=function(){o.remove();window.removeEventListener('popstate',hs)};try{history.pushState({prov:1},'');window.addEventListener('popstate',hs)}catch(e){}
+ var full=function(){var css=Array.prototype.map.call(document.querySelectorAll('style'),function(x){return x.textContent}).join('\n');return '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>الأنوار</title><style>'+css+'</style><style>body{background:#fff;color:#000;padding:8px}</style></head><body>'+html+'<script>setTimeout(function(){try{window.print()}catch(e){}},600)<\/script></body></html>'};
+ o.onclick=async function(e){var b=e.target.closest('[data-prx]');if(!b)return;var k=b.getAttribute('data-prx');
+  if(k=='back'){try{history.back()}catch(x){}return hs()}
+  if(k=='print'){var pv=$('#pv');if(pv)pv.remove();pv=document.createElement('div');pv.id='pv';pv.innerHTML=html;document.body.appendChild(pv);document.body.classList.add('printing');o.style.display='none';var done=function(){document.body.classList.remove('printing');o.style.display='';var q=$('#pv');if(q)q.remove();window.removeEventListener('afterprint',done)};window.addEventListener('afterprint',done);try{window.print()}catch(x){}setTimeout(done,1500);return}
+  var blob=new Blob([full()],{type:'text/html'});
+  if(k=='share'){try{await navigator.share({files:[new File([blob],'الأنوار.html',{type:'text/html'})],title:'الأنوار'})}catch(x){if(x&&x.name!='AbortError')msg('المشاركة مش مدعومة هنا، جرّب «افتح في المتصفح»',1)}return}
+  if(k=='open'){var u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},60000)}}}
 function doPrint(html){
- if(prStandalone()){var css=Array.prototype.map.call(document.querySelectorAll('style'),function(x){return x.textContent}).join('\n'),w=window.open('','_blank');
+ if(prStandalone()||/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)){return prOverlay(html)}
+ if(false){var css=Array.prototype.map.call(document.querySelectorAll('style'),function(x){return x.textContent}).join('\n'),w=window.open('','_blank');
   if(w){w.document.open();w.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>طباعة</title><style>'+css+'</style><style>body{background:#fff;color:#000;padding:8px}.np{margin:8px 0;text-align:center}@media print{.np{display:none}}</style></head><body><div class="np"><button onclick="window.print()" style="font-size:18px;padding:10px 24px">🖨 طباعة / حفظ PDF</button></div><div id="pv" style="display:block">'+html+'</div><script>setTimeout(function(){try{window.print()}catch(e){}},400)<\/script></body></html>');w.document.close();return}}
  var o=$('#pv');if(o)o.remove();o=document.createElement('div');o.id='pv';o.innerHTML=html;document.body.appendChild(o);document.body.classList.add('printing');
  var done=function(){document.body.classList.remove('printing');var p=$('#pv');if(p)p.remove();window.removeEventListener('afterprint',done)};window.addEventListener('afterprint',done);setTimeout(function(){window.print()},150)}
@@ -524,7 +535,7 @@ function phForm(r){var K=r.kind=='inquiry',sl=staffList(),hsk=(r.housing||'').in
 function phV(id){var e=$('#'+id);return e?String(e.value||'').trim():''}
 function phP(pre){var o={name:phV(pre+'n').replace(/\s+/g,' '),national_id:cuDig(phV(pre+'i')).replace(/\D/g,''),phone:cuDig(phV(pre+'p')).replace(/\D/g,''),address:phV(pre+'a'),id_address:phV(pre+'ia')};var r=$('#'+pre+'r');if(r)o.relation=r.value.trim();return o}
 async function phSave(btn){var K=PH.kind=='inquiry',bu=phP('phbu'),g1=phP('phg1'),g2=phP('phg2'),er=[];
- if(!bu.name)er.push('اسم المشتري');if(!/^\d{14}$/.test(bu.national_id)&&(K||!phV('phcode')))er.push('رقم قومي المشتري (14 رقم)');
+ if(!bu.name)er.push('اسم المشتري');if(bu.national_id&&!/^\d{14}$/.test(bu.national_id))er.push('رقم قومي المشتري لازم 14 رقم أو سيبه فاضي');else if(!bu.national_id&&!K&&!phV('phcode'))er.push('رقم قومي المشتري أو كود العقد');
  [g1,g2].forEach(function(g,i){if(g.national_id&&!/^\d{14}$/.test(g.national_id))er.push('رقم قومي الضامن '+(i+1))});
  if(bu.name&&cuWords(bu.name)<4)er.push('اسم المشتري لازم 4 كلمات على الأقل');
  var br=phV('phb');if(!br)er.push('الفرع');if(er.length)return msg('راجع: '+er.join('، '),1);
@@ -1129,7 +1140,7 @@ async function vInv(){
  var late=L.filter(function(i){return i.due_date&&i.due_date<today&&ACT.indexOf(i.status)>=0}).length;
  var st={};L.forEach(function(i){st[i.status]=(st[i.status]||0)+1;if(i.status=='approved'&&(dlv(i)||!RQ[i.id])){var k=dlv(i)?'approved_done':'approved_wait';st[k]=(st[k]||0)+1}});
  var open=S.invOpen||{},flt=S.invFlt||'';
- var form=creator&&!fOnly?'<div class="card"><h2>طلب استعلام جديد</h2><div class="f"><div><label for="nn">اسم العميل</label><input id="nn"></div><div><label for="nnid">الرقم القومي (14 رقمًا)</label><input id="nnid" inputmode="numeric" maxlength="14"></div><div><label for="nph">الهاتف</label><input id="nph" inputmode="tel"></div><div><label for="nad">العنوان</label><input id="nad"></div>'+(!pickBr()?'':'<div><label for="nb">الفرع</label><select id="nb">'+opts(S.branches,'id','name','','اختر')+'</select></div>')+'<div><label for="nt">النوع</label><select id="nt"><option value="credit">ائتماني</option><option value="housing">سكني</option><option value="job">وظيفي</option></select></div></div><button class="btn am" id="ia" style="margin-top:10px">تسجيل الطلب</button> <span class="hint">بعد التسجيل تُستكمل البيانات والمستندات داخل الطلب.</span>'+
+ var form=creator&&!fOnly?'<div class="card"><h2>طلب استعلام جديد</h2><div class="f"><div><label for="nn">اسم العميل</label><input id="nn"></div><div><label for="nnid">الرقم القومي (اختياري)</label><input id="nnid" inputmode="numeric" maxlength="14"></div><div><label for="nph">الهاتف</label><input id="nph" inputmode="tel"></div><div><label for="nad">العنوان</label><input id="nad"></div>'+(!pickBr()?'':'<div><label for="nb">الفرع</label><select id="nb">'+opts(S.branches,'id','name','','اختر')+'</select></div>')+'<div><label for="nt">النوع</label><select id="nt"><option value="credit">ائتماني</option><option value="housing">سكني</option><option value="job">وظيفي</option></select></div></div><button class="btn am" id="ia" style="margin-top:10px">تسجيل الطلب</button> <span class="hint">بعد التسجيل تُستكمل البيانات والمستندات داخل الطلب.</span>'+
   '<h2 style="margin-top:14px">البحث في تاريخ العميل</h2><div class="pay"><input id="hq" placeholder="الرقم القومي أو الهاتف أو الاسم (3 أحرف على الأقل)"><button class="btn" id="hb">بحث</button></div><div id="hr"></div></div>':'';
  function docs(i){var d=DC.filter(function(x){return x.investigation_id==i.id&&!(sOnly&&x.doc_type=='visit_photo')});
   var canD=creator&&(allInv||i.created_by==S.me.id)&&i.status=='documents'||visitor&&(i.assigned_agent==S.me.id||mgr||role=='system_admin')&&i.status=='visit';
@@ -1240,8 +1251,8 @@ async function vInv(){
   if(t.id=='hb'){var q=$('#hq').value.trim(),x=await sb.rpc('inv_history',{q:q});if(x.error)return msg(em(x.error),1);
    $('#hr').innerHTML=x.data.length?'<div class="wrap"><table><tr><th>الاسم</th><th>الرقم القومي</th><th>الحالة</th><th>الفرع</th><th>التاريخ</th><th>بواسطة</th></tr>'+x.data.map(function(r){return '<tr><td>'+esc(r.customer_name)+'</td><td>'+esc(r.national_id_masked)+'</td><td>'+esc(IS[r.status])+'</td><td>'+esc(r.branch_name)+'</td><td>'+fd(r.created_at)+'</td><td>'+esc(r.created_by_name)+'</td></tr>'}).join('')+'</table></div>':'<p class="hint">لا توجد نتائج سابقة.</p>';return}
   if(t.id=='ia'){var nid=$('#nid')?0:0,nm=$('#nn').value.trim(),ni=$('#nnid').value.trim(),bid=!pickBr()?S.me.branch_id:$('#nb').value;
-   if(!nm)return msg('اكتب اسم العميل',1);if(!/^\d{14}$/.test(ni))return msg('الرقم القومي يجب أن يكون 14 رقمًا',1);if(!bid)return msg('حدد الفرع',1);
-   var ix=await sb.from('investigations').insert({branch_id:bid,customer_name:nm,national_id:ni,customer_phone:$('#nph').value.trim()||null,customer_address:$('#nad').value.trim()||null,inv_type:$('#nt').value});
+   if(!nm)return msg('اكتب اسم العميل',1);ni=cuDig(ni).replace(/\D/g,'');if(ni&&!/^\d{14}$/.test(ni))return msg('الرقم القومي لازم 14 رقم، أو سيبه فاضي',1);if(!bid)return msg('حدد الفرع',1);
+   var ix=await sb.from('investigations').insert({branch_id:bid,customer_name:nm,national_id:ni||null,customer_phone:$('#nph').value.trim()||null,customer_address:$('#nad').value.trim()||null,inv_type:$('#nt').value});
    if(ix.error)return msg(em(ix.error),1);msg('تم تسجيل الطلب في مرحلة المستندات');vInv()}}
 }
 
@@ -2659,19 +2670,19 @@ function ivTemplate(){var b0=(brList()[0]||{}).name||'',e0=xlStaff()[0]||'';
 function ivParse(txt,defBr,defEmp){var rs=cuParse(txt);if(rs.length<2)return {err:'لا توجد بيانات. تأكد من صف العناوين وصفوف الاستعلامات'};
  var hd=rs[0].map(function(h){return cuNorm(h)}),ix={};IV_TH.forEach(function(h,j){var p=hd.indexOf(cuNorm(h));if(p>=0)ix[j]=p});
  [[2,['الاسم','العميل']],[3,['الموبايل','رقم الهاتف']],[21,['المرحلة']],[11,['الدخل','الدخل الشهري','صافي الدخل']],[12,['القسط الجديد','القسط']],[22,['السبب','ملاحظات','ملاحظات المبيعات']],[23,['موظف المبيعات','الموظف']]].forEach(function(m){if(ix[m[0]]==null)m[1].some(function(h){var p=hd.indexOf(cuNorm(h));if(p>=0){ix[m[0]]=p;return true}})});
- if(ix[2]==null||ix[4]==null)return {err:'لازم يكون فيه عمود «اسم العميل» وعمود «الرقم القومي»'};
+ if(ix[2]==null)return {err:'لازم يكون فيه عمود «اسم العميل»'};
  var EMP=xlEmpMap(),bmap={},hm={'تمليك':'owned','إيجار قديم':'old_rent','ايجار قديم':'old_rent','إيجار جديد':'new_rent','ايجار جديد':'new_rent'},ok=[],bad=[],seen={};
  brList().forEach(function(b){bmap[cuNorm(b.name)]=b.id});
  var g=function(r,j){return ix[j]==null?'':String(r[ix[j]]==null?'':r[ix[j]]).trim()};
  rs.slice(1).forEach(function(r){if(!r.some(function(x){return String(x||'').trim()}))return;if(/^مثال/.test(String(r[0]||'').trim()))return;
   var e=[],nid=cuDig(g(r,4)).replace(/\D/g,''),nm=g(r,2).replace(/\s+/g,' '),stx=g(r,21)||'جديد',st=IV_ST[stx],d=g(r,0)?kDate(g(r,0)):'',brx=g(r,1),bid=brx?bmap[cuNorm(brx)]||null:defBr,emx=g(r,23),emp=emx?EMP.get(emx):defEmp;
-  if(cuWords(nm)<2)e.push('اسم العميل ناقص');if(!/^\d{14}$/.test(nid))e.push('الرقم القومي لازم 14 رقم');if(!st)e.push('الحالة «'+stx+'» مش معروفة');if(d===null)e.push('التاريخ مش مفهوم');
+  if(cuWords(nm)<2)e.push('اسم العميل ناقص');if(nid&&!/^\d{14}$/.test(nid))e.push('الرقم القومي لازم 14 رقم أو سيبه فاضي');if(!st)e.push('الحالة «'+stx+'» مش معروفة');if(d===null)e.push('التاريخ مش مفهوم');
   if(!bid)e.push(brx?'الفرع «'+brx+'» مش معروف':'حدد الفرع');if(emp==='dup')e.push('اسم الموظف مكرر، اكتبه كامل');else if(emx&&!emp)e.push('الموظف «'+emx+'» مش موجود');
   var ph=cuDig(g(r,3)).replace(/\D/g,'');if(ph&&!/^01\d{9}$/.test(ph))e.push('الهاتف لازم 11 رقم');
   var gp=function(o){var x={name:g(r,o).replace(/\s+/g,' '),phone:cuDig(g(r,o+1)).replace(/\D/g,''),national_id:cuDig(g(r,o+2)).replace(/\D/g,''),relation:g(r,o+3)};if(x.national_id&&!/^\d{14}$/.test(x.national_id))e.push('الرقم القومي للضامن لازم 14 رقم');return x.name?x:{}};
-  var g1=gp(13),g2=gp(17),k=nid+'|'+(st=='documents'?'':d);if(seen[k])e.push('مكرر في الملف');seen[k]=1;
+  var g1=gp(13),g2=gp(17),k=(nid||nm)+'|'+(st=='documents'?'':d);if(seen[k])e.push('مكرر في الملف');seen[k]=1;
   if(e.length)return bad.push(r.concat([e.join('، ')]));
-  ok.push({row:r,p:{status:st,date:d||null,branch_id:bid,customer_name:nm,customer_phone:ph||null,national_id:nid,customer_address:g(r,5)||null,address_details:g(r,6)||null,housing:hm[g(r,7)]||null,employer_name:g(r,8)||null,employer_address:g(r,9)||null,job_title:g(r,10)||null,net_income:kNum(g(r,11)),new_installment:kNum(g(r,12)),guarantor1:g1,guarantor2:g2,reason:g(r,22)||null,created_by:emp||null}})});
+  ok.push({row:r,p:{status:st,date:d||null,branch_id:bid,customer_name:nm,customer_phone:ph||null,national_id:nid||null,customer_address:g(r,5)||null,address_details:g(r,6)||null,housing:hm[g(r,7)]||null,employer_name:g(r,8)||null,employer_address:g(r,9)||null,job_title:g(r,10)||null,net_income:kNum(g(r,11)),new_installment:kNum(g(r,12)),guarantor1:g1,guarantor2:g2,reason:g(r,22)||null,created_by:emp||null}})});
  return {ok:ok,bad:bad,head:rs[0]}}
 function ivExport(L){var CDn={approve:'موافقة',reject:'رفض',more_info:'محتاج بيانات'};
  var head=['التاريخ','الفرع','اسم العميل','الهاتف','الرقم القومي','العنوان','تفاصيل العنوان','نوع السكن','جهة العمل','الوظيفة','صافي الدخل','القسط المطلوب','الضامن الأول','هاتف الضامن الأول','الضامن الثاني','هاتف الضامن الثاني','المرحلة','القرار','موظف المبيعات','ملاحظات المبيعات'];
